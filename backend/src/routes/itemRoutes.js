@@ -12,7 +12,7 @@ router.get("/", protect, (req, res) => {
   });
 });
 
-// Only admin can add new menu item
+// Only admin can add new menu items
 router.post("/", protect, authorizeRoles("admin"), (req, res) => {
   const { name, description, price, stock, category } = req.body;
 

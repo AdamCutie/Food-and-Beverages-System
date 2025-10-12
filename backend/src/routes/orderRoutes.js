@@ -13,7 +13,7 @@ router.get("/", protect, (req, res) => {
   });
 });
 
-// Example: Place a new order
+// Example: Place a new orders
 router.post("/", protect, (req, res) => {
   const { total_amount, status } = req.body;
   const sql = "INSERT INTO orders (customer_id, total_amount, status) VALUES (?, ?, ?)";

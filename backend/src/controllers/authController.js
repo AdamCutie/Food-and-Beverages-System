@@ -42,7 +42,7 @@ export const registerUser = async (req, res) => {
   }
 };
 
-// LOGIN USER
+// LOGIN USERS
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
