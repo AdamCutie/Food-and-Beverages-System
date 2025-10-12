@@ -1,34 +1,38 @@
 import jwt from "jsonwebtoken";
-import asyncHandler from "express-async-handler";
-import User from "../models/User.js";
+import dotenv from "dotenv";
+dotenv.config();
 
-export const protect = asyncHandler( async (req, res, next) => {
-  // Dev bypass
-  if (process.env.DEV_MODE === "true") {
-    req.user = { id: "dev", role: "Dev", name: "Dev Admin", email: "admin@example.com" };
-    return next();
-  }
-
-  let token;
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    token = req.headers.authorization.split(" ")[1];
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select("-passwordHash");
-      next();
-    } catch (err) {
-      res.status(401);
-      throw new Error("Not authorized, token failed");
+/**
+ * Middleware to verify JWT token
+ */
+export const protect = (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Access denied. No token provided." });
     }
-  } else {
-    res.status(401);
-    throw new Error("Not authorized, no token");
-  }
-});
 
-export const authorizeRoles = (...roles) => (req, res, next) => {
-  if (process.env.DEV_MODE === "true") return next();
-  if (!req.user) return res.status(401).json({ message: 'Not authorized' });
-  if (!roles.includes(req.user.role)) return res.status(403).json({ message: 'Forbidden' });
-  next();
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Attach user info to the request
+    req.user = decoded;
+
+    next();
+  } catch (err) {
+    console.error("JWT verification failed:", err.message);
+    res.status(401).json({ message: "Invalid or expired token" });
+  }
+};
+
+/**
+ * Middleware to restrict routes to specific roles
+ */
+export const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Access forbidden: insufficient privileges" });
+    }
+    next();
+  };
 };
