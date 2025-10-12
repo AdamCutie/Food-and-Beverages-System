@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 /**
- * Middleware to verify JWT token
+ * Middleware to verify JWT tokens
  */
 export const protect = (req, res, next) => {
   try {
