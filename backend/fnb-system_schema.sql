@@ -1,6 +1,6 @@
-CREATE DATABASE IF NOT EXISTS `fnb_system`;
+CREATE DATABASE IF NOT EXISTS `food_beverage_db`;
 
-USE `fnb_system`;
+USE `food_beverage_db`;
 
 -- Create Customers Table
 CREATE TABLE `customers` (
