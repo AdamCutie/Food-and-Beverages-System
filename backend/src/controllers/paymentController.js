@@ -1,34 +1,49 @@
-import asyncHandler from "express-async-handler";
-import connection from "../config/mysql.js";
+import pool from "../config/mysql.js";
 
 // @desc    Record a new payment
 // @route   POST /api/payments
-// @access  Private
-export const addPayment = asyncHandler(async (req, res) => {
-  const { order_id, amount, method, status } = req.body;
+// @access  Cashier/Admin
+export const recordPayment = async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
 
-  if (!order_id || !amount) {
-    res.status(400);
-    throw new Error("Order ID and amount are required");
-  }
+        const { order_id, payment_method, amount_paid, change_amount } = req.body;
+        
+        if(!order_id || !amount_paid) {
+            return res.status(400).json({ message: "Order ID and amount paid are required."});
+        }
 
-  const [result] = await connection.query(
-    "INSERT INTO payments (order_id, amount, method, status) VALUES (?, ?, ?, ?)",
-    [order_id, amount, method || "cash", status || "completed"]
-  );
+        const paymentSql = "INSERT INTO payments (order_id, payment_method, amount_paid, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
+        const [paymentResult] = await connection.query(paymentSql, [order_id, payment_method, amount_paid, change_amount || 0]);
 
-  res.status(201).json({
-    message: "Payment recorded successfully",
-    paymentId: result.insertId,
-  });
-});
+        // Update order status to paid
+        await connection.query("UPDATE orders SET order_status = 'paid' WHERE order_id = ?", [order_id]);
 
-// @desc    Get all payments
-// @route   GET /api/payments
-// @access  Private/Admin
-export const getPayments = asyncHandler(async (req, res) => {
-  const [payments] = await connection.query(
-    "SELECT p.*, o.total_amount FROM payments p JOIN orders o ON p.order_id = o.id"
-  );
-  res.json(payments);
-});
+        await connection.commit();
+
+        res.status(201).json({ 
+            payment_id: paymentResult.insertId,
+            message: "Payment recorded successfully" 
+        });
+
+    } catch (error) {
+        await connection.rollback();
+        res.status(500).json({ message: "Failed to record payment", error: error.message });
+    } finally {
+        connection.release();
+    }
+};
+
+// @desc    Get payments for an order
+// @route   GET /api/payments/:order_id
+// @access  Staff/Admin
+export const getPaymentsForOrder = async (req, res) => {
+    try {
+        const { order_id } = req.params;
+        const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [order_id]);
+        res.json(payments);
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching payments", error: error.message });
+    }
+};

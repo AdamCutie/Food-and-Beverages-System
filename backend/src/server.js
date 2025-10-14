@@ -1,15 +1,19 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import db from "./config/mysql.js"; // initialize connection
+import pool from "../src/config/mysql.js";
 
-import authRoutes from "./routes/authRoutes.js";
-import itemRoutes from "./routes/itemRoutes.js";
-import orderRoutes from "./routes/orderRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes.js";
+// Middleware
+import { notFound, errorHandler } from "../src/middleware/errorMiddleware.js";
+import { apiLimiter, authLimiter } from "../src/middleware/rateLimiter.js";
 
-import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
+// Routes
+import authRoutes from "../src/routes/authRoutes.js";
+import itemRoutes from "../src/routes/itemRoutes.js";
+import orderRoutes from "../src/routes/orderRoutes.js";
+import paymentRoutes from "../src/routes/paymentRoutes.js";
+import adminRoutes from "../src/routes/adminRoutes.js";
+
 
 dotenv.config();
 
@@ -17,15 +21,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Test route
-app.get("/", (req, res) => res.send({ status: "OK", time: new Date() }));
+// Apply the general API rate limiter to all requests starting with /api
+app.use("/api/", apiLimiter);
+
+// Test DB Connection
+app.get("/api/health", async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.send({ status: "OK", database: "Connected", time: new Date() });
+  } catch (e) {
+    res.status(500).send({ status: "Error", database: "Not Connected", error: e.message });
+  }
+});
+
 
 // API routes
-app.use("/api/auth", authRoutes);
+// Apply the stricter auth limiter specifically to auth routes
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/orders", orderRoutes);
-app.use("/api/admin", adminRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Error middleware
 app.use(notFound);
