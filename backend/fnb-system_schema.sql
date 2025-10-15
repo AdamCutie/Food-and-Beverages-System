@@ -69,3 +69,8 @@ INSERT INTO `menu_items` (`item_name`, `category`, `price`, `availability`) VALU
 ('French Fries', 'Side Dish', 80.00, TRUE),
 ('Iced Tea', 'Beverage', 60.00, TRUE),
 ('Carbonara', 'Pasta', 320.00, FALSE);
+
+-- This script safely adds the 'shift_schedule' column to the existing 'staff' table
+
+ALTER TABLE `staff`
+ADD COLUMN `shift_schedule` VARCHAR(255) DEFAULT NULL;
