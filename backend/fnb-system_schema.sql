@@ -74,3 +74,25 @@ INSERT INTO `menu_items` (`item_name`, `category`, `price`, `availability`) VALU
 
 ALTER TABLE `staff`
 ADD COLUMN `shift_schedule` VARCHAR(255) DEFAULT NULL;
+
+-- This script delete the 'menu_items' table to replace the
+-- 'availability' column with a new 'stock' column.
+
+DROP TABLE IF EXISTS `menu_items`;
+
+-- Create Menu Items Table
+-- UPDATED: Replaced 'availability' with 'stock'
+CREATE TABLE `menu_items` (
+  `item_id` INT AUTO_INCREMENT PRIMARY KEY,
+  `item_name` VARCHAR(255) NOT NULL,
+  `category` VARCHAR(100),
+  `price` DECIMAL(10, 2) NOT NULL,
+  `stock` INT NOT NULL DEFAULT 0
+);
+
+-- Insert some sample data with stock counts
+INSERT INTO `menu_items` (`item_name`, `category`, `price`, `stock`) VALUES
+('Cheeseburger', 'Main Course', 250.00, 50),
+('French Fries', 'Side Dish', 80.00, 100),
+('Iced Tea', 'Beverage', 60.00, 75),
+('Carbonara', 'Pasta', 320.00, 0);
