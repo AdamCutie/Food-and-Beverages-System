@@ -7,13 +7,13 @@ import pool from "../config/mysql.js";
 // @access  Public
 export const registerUser = async (req, res) => {
   try {
-    const { full_name, email, password, phone, role } = req.body;
+    const { full_name, email, password, phone, role = "customer" } = req.body;
 
     // Validate essential fields
-    if (!full_name || !email || !password || !role) {
+    if (!full_name || !email || !password) {
       return res
         .status(400)
-        .json({ message: "Full name, email, password, and role are required" });
+        .json({ message: "Full name, email, and password are required" });
     }
 
     const salt = await bcrypt.genSalt(10);
