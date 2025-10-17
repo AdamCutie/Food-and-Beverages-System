@@ -101,7 +101,7 @@ export const loginUser = async (req, res) => {
       return res.json({ token });
     } else {
       // If user not found or password incorrect, send a generic error message
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "Invalid credentials: User not found or password incorrect" });
     }
   } catch (error) {
     console.error("Login Error:", error);
