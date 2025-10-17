@@ -18,7 +18,7 @@ export const getAllStaff = async (req, res) => {
 // @access  Admin
 export const getAllCustomers = async (req, res) => {
     try {
-        const [customers] = await pool.query("SELECT customer_id, full_name, email, phone, customer_type FROM customers");
+        const [customers] = await pool.query("SELECT customer_id, full_name, email, phone, created_at FROM customers");
         res.json(customers);
     } catch (error) {
         res.status(500).json({ message: "Error fetching customer list", error: error.message });

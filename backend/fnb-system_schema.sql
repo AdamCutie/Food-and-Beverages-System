@@ -96,3 +96,10 @@ INSERT INTO `menu_items` (`item_name`, `category`, `price`, `stock`) VALUES
 ('French Fries', 'Side Dish', 80.00, 100),
 ('Iced Tea', 'Beverage', 60.00, 75),
 ('Carbonara', 'Pasta', 320.00, 0);
+
+-- This script safely adds the 'change_amount' and 'payment_status' columns
+-- to the existing 'payments' table without deleting any data.
+
+ALTER TABLE `payments`
+  ADD COLUMN `change_amount` DECIMAL(10, 2) DEFAULT 0.00,
+  ADD COLUMN `payment_status` VARCHAR(50) DEFAULT 'paid';
