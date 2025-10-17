@@ -81,15 +81,22 @@ export const getOrders = async (req, res) => {
 export const getOrderById = async (req, res) => {
     try {
         const { id } = req.params;
-        const [order] = await pool.query("SELECT * FROM orders WHERE order_id = ?", [id]);
+        const [orders] = await pool.query("SELECT * FROM orders WHERE order_id = ?", [id]);
         
-        if (order.length === 0) {
+        if (orders.length === 0) {
             return res.status(404).json({ message: "Order not found" });
+        }
+
+        const order = orders[0];
+
+        // CRITICAL FIX: Ensure a customer can only view their own orders.
+        if (req.user.role === 'customer' && order.customer_id !== req.user.id) {
+            return res.status(403).json({ message: "Access forbidden: You can only view your own orders." });
         }
 
         const [details] = await pool.query("SELECT od.*, mi.item_name FROM order_details od JOIN menu_items mi ON od.item_id = mi.item_id WHERE order_id = ?", [id]);
 
-        res.json({ ...order[0], details });
+        res.json({ ...order, details });
     } catch (error) {
         res.status(500).json({ message: "Error fetching order details", error: error.message });
     }
