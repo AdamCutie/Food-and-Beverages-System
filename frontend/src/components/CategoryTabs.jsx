@@ -1,26 +1,27 @@
-import React from "react";
+import React from 'react';
 
-const categories = ["All", "Appetizers", "Main Course", "Desserts", "Drinks"];
-
-export default function CategoryTabs({ active, onChange }) {
+// Receive the new props
+const CategoryTabs = ({ categories, selectedCategory, onSelectCategory }) => {
   return (
-    <div className="flex justify-center bg-white shadow-sm py-4">
-      <div className="flex flex-wrap justify-center gap-3">
-        {categories.map((cat) => (
+    <div className="mt-8">
+      <div className="flex space-x-4 border-b">
+        {/* Map over the categories to create a button for each one */}
+        {categories.map((category) => (
           <button
-            key={cat}
-            onClick={() => onChange(cat)}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200
-              ${
-                active === cat
-                  ? "bg-[#053a34] text-white shadow-md"
-                  : "bg-gray-100 text-[#053a34] hover:bg-gray-200"
-              }`}
+            key={category}
+            onClick={() => onSelectCategory(category)}
+            className={`py-2 px-4 text-lg font-semibold transition-colors ${
+              selectedCategory === category
+                ? 'border-b-2 border-orange-500 text-orange-500' // Active style
+                : 'text-gray-500 hover:text-orange-500' // Inactive style
+            }`}
           >
-            {cat}
+            {category}
           </button>
         ))}
       </div>
     </div>
   );
-}
+};
+
+export default CategoryTabs;
