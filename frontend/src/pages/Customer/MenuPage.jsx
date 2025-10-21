@@ -1,10 +1,10 @@
 import React from 'react';
 import { useState, useEffect } from 'react';
-import HeaderBar from '../components/HeaderBar';
-import PromoBanner from '../components/PromoBanner';
-import CategoryTabs from '../components/CategoryTabs';
-import FoodGrid from '../components/FoodGrid';
-import CartPanel from '../components/CartPanel';
+import HeaderBar from '../../components/HeaderBar';
+import PromoBanner from '../../components/PromoBanner';
+import CategoryTabs from '../../components/CategoryTabs';
+import FoodGrid from '../../components/FoodGrid';
+import CartPanel from '../../components/CartPanel';
 
 function MenuPage() {
   const [items, setItems] = useState([]);

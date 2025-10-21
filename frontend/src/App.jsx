@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import MenuPage from './pages/MenuPage';
-import AdminPage from './pages/AdminPage'; 
+import MenuPage from './pages/Customer/MenuPage';
+import AdminPage from './pages/Admin/AdminPage'; 
 
 function App() {
   return (
