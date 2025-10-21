@@ -77,16 +77,22 @@ export const updateMenuItem = async (req, res) => {
 // @route   DELETE /api/admin/items/:id
 // @access  Admin
 export const deleteMenuItem = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const [result] = await pool.query("DELETE FROM menu_items WHERE item_id = ?", [id]);
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Menu item not found" });
-        }
-        res.json({ message: "Menu item deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ message: "Server error deleting item", error: error.message });
+  const { id } = req.params; // Get the item_id from the URL
+
+  try {
+    const sql = "DELETE FROM menu_items WHERE item_id = ?";
+    const [result] = await pool.query(sql, [id]);
+
+    if (result.affectedRows === 0) {
+      // If no rows were deleted, the item was not found
+      return res.status(404).json({ message: 'Item not found' });
     }
+
+    res.status(200).json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    console.error("Error deleting item:", error);
+    res.status(500).json({ message: "Failed to delete menu item", error: error.message });
+  }
 };
 
 // --- NEW HELPER FUNCTIONS FOR STOCK MANAGEMENT ---

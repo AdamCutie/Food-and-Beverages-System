@@ -1,15 +1,10 @@
 import React, { useState } from 'react';
 import { Edit, Trash2 } from 'lucide-react';
-import AddItemModal from './AddItemModal'
+import AddItemModal from './AddItemModal';
 
-const MenuManagementTable = ({ items, onSaveNewItem, categories }) => {
+const MenuManagementTable = ({ items, categories, onSaveNewItem, onDeleteItem }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleSaveItem = (formData) => {
-    console.log('New item data:', formData);
-    // Logic to send data to the backend will go here
-    setIsModalOpen(false); // Close modal on save
-  };
   return (
     <div className="mt-12">
       <div className="flex justify-between items-center mb-6">
@@ -21,10 +16,12 @@ const MenuManagementTable = ({ items, onSaveNewItem, categories }) => {
           Add New Item
         </button>
       </div>
+
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <table className="min-w-full leading-normal">
+          {/* --- THIS IS THE CORRECTED TABLE HEADER --- */}
           <thead>
-            <tr className="bg-gray-200 text-gray-600 uppercase text-sm leading-normal">
+            <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
               <th className="py-3 px-6 text-left">Item Name</th>
               <th className="py-3 px-6 text-left">Category</th>
               <th className="py-3 px-6 text-center">Price</th>
@@ -34,7 +31,8 @@ const MenuManagementTable = ({ items, onSaveNewItem, categories }) => {
           </thead>
           <tbody className="text-gray-600 text-sm font-light">
             {items.map((item) => (
-              <tr key={item.item_id} className="border-b border-gray-200 hover:bg-gray-100">
+              <tr key={item.item_id} className="border-b border-gray-200 hover:bg-gray-50">
+                {/* --- THESE ARE THE CORRECTED TABLE CELLS --- */}
                 <td className="py-3 px-6 text-left">
                   <span className="font-medium">{item.item_name}</span>
                 </td>
@@ -52,7 +50,10 @@ const MenuManagementTable = ({ items, onSaveNewItem, categories }) => {
                     <button className="text-blue-500 hover:text-blue-700">
                       <Edit size={20} />
                     </button>
-                    <button className="text-red-500 hover:text-red-700">
+                    <button
+                      onClick={() => onDeleteItem(item.item_id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
                       <Trash2 size={20} />
                     </button>
                   </div>
@@ -61,15 +62,14 @@ const MenuManagementTable = ({ items, onSaveNewItem, categories }) => {
             ))}
           </tbody>
         </table>
-        
-        {/* Render the modal component */}
-      <AddItemModal
-    isOpen={isModalOpen}
-    onClose={() => setIsModalOpen(false)}
-    onSave={onSaveNewItem}
-    categories={categories} // <-- Pass categories to the modal
-  />
       </div>
+
+      <AddItemModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={onSaveNewItem}
+        categories={categories}
+      />
     </div>
   );
 };

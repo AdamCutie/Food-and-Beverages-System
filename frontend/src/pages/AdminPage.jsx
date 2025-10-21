@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import MenuManagementTable from './MenuManagementTable';
 
-// This component now contains the full table structure for orders.
+// Order Management Table Component
 const OrderManagementTable = ({ orders }) => (
   <div className="bg-white shadow-md rounded-lg overflow-hidden">
     <h2 className="text-2xl font-bold p-6">Order Management</h2>
@@ -19,15 +19,9 @@ const OrderManagementTable = ({ orders }) => (
       <tbody className="text-gray-600 text-sm font-light">
         {orders.map((order) => (
           <tr key={order.order_id} className="border-b border-gray-200 hover:bg-gray-50">
-            <td className="py-3 px-6 text-left whitespace-nowrap">
-              <span className="font-medium">{order.order_id}</span>
-            </td>
-            <td className="py-3 px-6 text-left">
-              <span>{order.customer_id}</span>
-            </td>
-            <td className="py-3 px-6 text-center">
-              <span className="font-medium">${parseFloat(order.total_amount).toFixed(2)}</span>
-            </td>
+            <td className="py-3 px-6 text-left whitespace-nowrap">{order.order_id}</td>
+            <td className="py-3 px-6 text-left">{order.customer_id}</td>
+            <td className="py-3 px-6 text-center">${parseFloat(order.total_amount).toFixed(2)}</td>
             <td className="py-3 px-6 text-center">
               <span
                 className={`py-1 px-3 rounded-full text-xs font-semibold ${
@@ -40,9 +34,7 @@ const OrderManagementTable = ({ orders }) => (
                 {order.status}
               </span>
             </td>
-            <td className="py-3 px-6 text-left">
-              <span>{new Date(order.order_date).toLocaleString()}</span>
-            </td>
+            <td className="py-3 px-6 text-left">{new Date(order.order_date).toLocaleString()}</td>
           </tr>
         ))}
       </tbody>
@@ -79,14 +71,47 @@ function AdminPage() {
     fetchData();
   }, []);
 
+  const handleAddNewItem = async (formData) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!response.ok) throw new Error('Failed to save the item.');
+      const newItem = await response.json();
+      setMenuItems(prevItems => [...prevItems, newItem]);
+    } catch (error) {
+      console.error('Save error:', error);
+      alert(error.message);
+    }
+  };
+
+  const handleDeleteItem = async (itemIdToDelete) => {
+    if (!window.confirm('Are you sure you want to delete this item?')) return;
+    try {
+      const response = await fetch(`http://localhost:3000/api/items/${itemIdToDelete}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete the item.');
+      setMenuItems(prevItems => prevItems.filter(item => item.item_id !== itemIdToDelete));
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert(error.message);
+    }
+  };
+
   if (loading) return <div className="p-8">Loading dashboard...</div>;
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
+
+  const uniqueCategories = ['All', ...new Set(menuItems.map(item => item.category))];
 
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-4">Admin Dashboard</h1>
       <Link to="/" className="text-blue-500 hover:underline mb-8 block">&larr; Back to Menu</Link>
       
+      {/* --- THIS IS THE CORRECTED NAVIGATION SECTION --- */}
       <nav className="flex space-x-4 border-b mb-8">
         <button
           onClick={() => setCurrentView('orders')}
@@ -112,7 +137,14 @@ function AdminPage() {
 
       <main>
         {currentView === 'orders' && <OrderManagementTable orders={orders} />}
-        {currentView === 'menu' && <MenuManagementTable items={menuItems} />}
+        {currentView === 'menu' && (
+          <MenuManagementTable
+            items={menuItems}
+            categories={uniqueCategories.filter(c => c !== 'All')}
+            onSaveNewItem={handleAddNewItem}
+            onDeleteItem={handleDeleteItem}
+          />
+        )}
       </main>
     </div>
   );
