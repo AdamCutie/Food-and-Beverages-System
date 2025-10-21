@@ -12,6 +12,9 @@ function MenuPage() {
   const [cartItems, setCartItems] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+  const categories = ['All', ...new Set(items.map(item => item.category))];
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -35,7 +38,11 @@ function MenuPage() {
     setSearchTerm(event.target.value);
   };
 
-  const categories = ['All', ...new Set(items.map(item => item.category))];
+  const toggleCart = () => {
+    setIsCartOpen(!isCartOpen);
+  };
+
+
 
   const filteredItems = items
     .filter(item => selectedCategory === 'All' || item.category === selectedCategory)
@@ -108,33 +115,35 @@ function MenuPage() {
     }
   };
 
+
   return (
     <div className="bg-gray-100 min-h-screen">
-      <HeaderBar
+      <HeaderBar 
+        cartCount={cartCount} 
+        onCartToggle={toggleCart}
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
       />
+      {/* The 'container' class will handle the centering */}
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-12 gap-8">
-          <div className="col-span-12 lg:col-span-8">
-            <PromoBanner />
-            <CategoryTabs
-              categories={categories}
-              selectedCategory={selectedCategory}
-              onSelectCategory={handleSelectCategory}
-            />
-            {error && <p className="text-red-500">Error: {error}</p>}
-            <FoodGrid items={filteredItems} onAddToCart={handleAddToCart} />
-          </div>
-          <div className="col-span-12 lg:col-span-4">
-            <CartPanel
-              cartItems={cartItems}
-              onUpdateQuantity={handleUpdateQuantity}
-              onPlaceOrder={handlePlaceOrder}
-            />
-          </div>
+        <div> {/* This div wraps the main content */}
+          <PromoBanner />
+          <CategoryTabs 
+            categories={categories}
+            selectedCategory={selectedCategory}
+            onSelectCategory={handleSelectCategory}
+          />
+          <FoodGrid items={filteredItems} onAddToCart={handleAddToCart} />
         </div>
       </main>
+
+      <CartPanel 
+        cartItems={cartItems} 
+        onUpdateQuantity={handleUpdateQuantity} 
+        onPlaceOrder={handlePlaceOrder}
+        isOpen={isCartOpen}
+        onClose={toggleCart}
+      />
     </div>
   );
 }

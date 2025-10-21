@@ -34,7 +34,7 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
+    <div className="fixed inset-0 bg-black/75 z-50 flex justify-center items-center">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">{isEditMode ? 'Edit Menu Item' : 'Add New Menu Item'}</h2>
