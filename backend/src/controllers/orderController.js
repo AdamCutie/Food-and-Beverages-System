@@ -4,34 +4,34 @@ import pool from "../config/mysql.js";
 // @route   POST /api/orders
 // @access  Private (Customer)
 export const createOrder = async (req, res) => {
-    // This function is already working, so we leave it as is.
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
-        const { customer_id, total_price, items } = req.body;
-        let total_amount = 0;
 
-        for (const item of items) {
-            const [rows] = await connection.query("SELECT price, stock FROM menu_items WHERE item_id = ?", [item.item_id]);
-            if (rows.length === 0) {
-                throw new Error(`Item with ID ${item.item_id} not found.`);
-            }
-            if (rows[0].stock < item.quantity) {
-                throw new Error(`Not enough stock for item ID ${item.item_id}. Available: ${rows[0].stock}, Requested: ${item.quantity}`);
-            }
-            total_amount += rows[0].price * item.quantity;
+        // --- FIX: Destructure all fields from the body ---
+        const { customer_id, items, order_type, instructions, total_price, delivery_location } = req.body;
+
+        if (!customer_id || !items || items.length === 0 || !delivery_location) {
+            throw new Error("Missing required order information.");
         }
 
-        const orderSql = "INSERT INTO orders (customer_id, total_amount) VALUES (?, ?)";
-        const [orderResult] = await connection.query(orderSql, [customer_id, total_amount]);
+        // --- FIX: Use total_price from the frontend and name it correctly for the DB ---
+        const total_amount = total_price; 
+
+        // Step 2: Create the order, now including the order_type
+        const orderSql = "INSERT INTO orders (customer_id, total_amount, order_type, delivery_location) VALUES (?, ?, ?, ?)";
+        const [orderResult] = await connection.query(orderSql, [customer_id, total_amount, order_type, delivery_location]);
         const order_id = orderResult.insertId;
 
+        // Step 3: Insert order details, now including the instructions
         for (const item of items) {
             const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
-
-            const detailSql = "INSERT INTO order_details (order_id, item_id, quantity, subtotal) VALUES (?, ?, ?, ?)";
-            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal]);
+            
+            // --- FIX: Correctly insert instructions into order_details ---
+            // Note: This applies the same instruction to all items.
+            const detailSql = "INSERT INTO order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
+            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
 
             const stockSql = "UPDATE menu_items SET stock = stock - ? WHERE item_id = ?";
             await connection.query(stockSql, [item.quantity, item.item_id]);
@@ -42,12 +42,12 @@ export const createOrder = async (req, res) => {
 
     } catch (error) {
         await connection.rollback();
+        console.error("CREATE ORDER ERROR:", error); // Log the full error for debugging
         res.status(500).json({ message: "Failed to create order", error: error.message });
     } finally {
         connection.release();
     }
 };
-
 // @desc    Get all orders
 // @route   GET /api/orders
 // @access  Private

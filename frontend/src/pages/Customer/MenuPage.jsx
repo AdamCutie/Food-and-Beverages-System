@@ -14,9 +14,19 @@ function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  
+  // --- NEW STATES FOR CART ---
+  const [orderType, setOrderType] = useState('Dine-in'); 
+  const [instructions, setInstructions] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const categories = ['All', ...new Set(items.map(item => item.category))];
-  const [selectedImage, setSelectedImage] = useState(null);
+
+  useEffect(() => {
+    setDeliveryLocation('');
+  }, [orderType]);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -44,11 +54,8 @@ function MenuPage() {
     setIsCartOpen(!isCartOpen);
   };
 
-
-
   const filteredItems = items
     .filter(item => selectedCategory === 'All' || item.category === selectedCategory)
-    // --- THIS IS THE LINE THAT WAS FIXED ---
     .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleSelectCategory = (category) => {
@@ -69,9 +76,15 @@ function MenuPage() {
     });
   };
 
+  // --- NEW FUNCTION TO REMOVE ITEM ---
+  const handleRemoveItem = (itemIdToRemove) => {
+    setCartItems(prevItems => prevItems.filter(item => item.item_id !== itemIdToRemove));
+  };
+
   const handleUpdateQuantity = (itemId, newQuantity) => {
+    // UPDATED to use handleRemoveItem
     if (newQuantity <= 0) {
-      setCartItems((prevItems) => prevItems.filter((item) => item.item_id !== itemId));
+      handleRemoveItem(itemId);
     } else {
       setCartItems((prevItems) =>
         prevItems.map((item) =>
@@ -81,18 +94,22 @@ function MenuPage() {
     }
   };
 
+  // --- UPDATED to include orderType and instructions ---
   const handlePlaceOrder = async () => {
-    if (cartItems.length === 0) {
+    if (cartItems.length === 0 || !deliveryLocation) {
       alert("Your cart is empty!");
       return;
     }
     const totalPrice = cartItems.reduce(
-      (total, item) => total + item.price * item.quantity,
+      (total, item) => total + parseFloat(item.price) * item.quantity,
       0
     );
     const orderData = {
       customer_id: 1,
       total_price: totalPrice,
+      order_type: orderType, // <-- ADDED
+      instructions: instructions, // <-- ADDED
+      delivery_location: deliveryLocation,
       items: cartItems.map(item => ({
         item_id: item.item_id,
         quantity: item.quantity,
@@ -111,12 +128,12 @@ function MenuPage() {
       }
       alert('Order placed successfully!');
       setCartItems([]);
+      setInstructions(''); // Clear instructions after order
     } catch (err) {
       console.error('Error placing order:', err);
       alert(`Error: ${err.message}`);
     }
   };
-
 
   return (
     <div className="bg-gray-100 min-h-screen">
@@ -126,9 +143,8 @@ function MenuPage() {
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
       />
-      {/* The 'container' class will handle the centering */}
       <main className="container mx-auto px-4 py-8">
-        <div> {/* This div wraps the main content */}
+        <div>
           <PromoBanner />
           <CategoryTabs 
             categories={categories}
@@ -138,17 +154,25 @@ function MenuPage() {
           <FoodGrid 
             items={filteredItems} 
             onAddToCart={handleAddToCart}
-            onImageClick={(imageUrl) => setSelectedImage(imageUrl)} // Pass the handler
+            onImageClick={(imageUrl) => setSelectedImage(imageUrl)}
           />
         </div>
       </main>
 
+      {/* --- PASS ALL NEW PROPS TO CARTPANEL --- */}
       <CartPanel 
         cartItems={cartItems} 
         onUpdateQuantity={handleUpdateQuantity} 
         onPlaceOrder={handlePlaceOrder}
         isOpen={isCartOpen}
         onClose={toggleCart}
+        orderType={orderType}
+        setOrderType={setOrderType}
+        instructions={instructions}
+        setInstructions={setInstructions}
+        onRemoveItem={handleRemoveItem}
+        deliveryLocation={deliveryLocation}
+        setDeliveryLocation={setDeliveryLocation}
       />
 
       <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
