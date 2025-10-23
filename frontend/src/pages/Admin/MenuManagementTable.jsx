@@ -3,7 +3,17 @@ import React from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 
 // Destructure the correct props: onAddItem, onEditItem, onDeleteItem
-const MenuManagementTable = ({ items, onAddItem, onEditItem, onDeleteItem }) => {
+const MenuManagementTable = ({ 
+  items, // This is now the filtered list
+  totalItems, 
+  categories, 
+  selectedCategory,
+  onFilterChange,
+  onClearFilters,
+  onAddItem, 
+  onEditItem, 
+  onDeleteItem 
+}) => {
   return (
     <div className="mt-12">
       <div className="flex justify-between items-center mb-6">
@@ -14,6 +24,31 @@ const MenuManagementTable = ({ items, onAddItem, onEditItem, onDeleteItem }) => 
           className="bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-600 transition-colors"
         >
           Add New Item
+        </button>
+      </div>
+
+      {/* --- NEW Filter Controls --- */}
+      <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-md shadow">
+        <div>
+          <label htmlFor="categoryFilter" className="mr-2 text-sm font-medium text-gray-700">Filter by Category:</label>
+          <select 
+            id="categoryFilter"
+            value={selectedCategory}
+            onChange={(e) => onFilterChange(e.target.value)}
+            className="border border-gray-300 rounded-md p-2 text-sm"
+          >
+            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
+        </div>
+        <span className="text-sm font-medium text-gray-700">
+            Total Menu Items: {totalItems}
+          </span>
+        <button 
+          onClick={onClearFilters}
+          className="text-sm text-blue-500 hover:underline"
+          disabled={selectedCategory === 'All'} // Disable if already showing all
+        >
+          Clear Filters
         </button>
       </div>
 
@@ -38,7 +73,7 @@ const MenuManagementTable = ({ items, onAddItem, onEditItem, onDeleteItem }) => 
                   <span>{item.category}</span>
                 </td>
                 <td className="py-3 px-6 text-center">
-                  <span>${parseFloat(item.price).toFixed(2)}</span>
+                  <span>₱{parseFloat(item.price).toFixed(2)}</span>
                 </td>
                 <td className="py-3 px-6 text-center">
                   <span>{item.stock}</span>
@@ -65,7 +100,6 @@ const MenuManagementTable = ({ items, onAddItem, onEditItem, onDeleteItem }) => 
           </tbody>
         </table>
       </div>
-      {/* The AddItemModal is no longer rendered here */}
     </div>
   );
 };

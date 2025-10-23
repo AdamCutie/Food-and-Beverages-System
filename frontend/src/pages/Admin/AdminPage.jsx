@@ -12,9 +12,14 @@ const OrderManagementTable = ({ orders }) => (
       <thead>
         <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
           <th className="py-3 px-6 text-left">Order ID</th>
-          <th className="py-3 px-6 text-left">Customer ID</th>
-          <th className="py-3 px-6 text-center">Total Amount</th>
+          <th className="py-3 px-6 text-left">Cust. ID</th>
+          {/* NEW Columns */}
+          <th className="py-3 px-6 text-left">Type</th>
+          <th className="py-3 px-6 text-left">Location</th>
+          {/* --- */}
+          <th className="py-3 px-6 text-center">Total</th>
           <th className="py-3 px-6 text-center">Status</th>
+          {/* MOVED Column */}
           <th className="py-3 px-6 text-left">Date</th>
         </tr>
       </thead>
@@ -23,7 +28,11 @@ const OrderManagementTable = ({ orders }) => (
           <tr key={order.order_id} className="border-b border-gray-200 hover:bg-gray-50">
             <td className="py-3 px-6 text-left whitespace-nowrap">{order.order_id}</td>
             <td className="py-3 px-6 text-left">{order.customer_id}</td>
-            <td className="py-3 px-6 text-center">${parseFloat(order.total_amount).toFixed(2)}</td>
+            {/* NEW Data Cells */}
+            <td className="py-3 px-6 text-left">{order.order_type}</td>
+            <td className="py-3 px-6 text-left">{order.delivery_location}</td>
+            {/* --- */}
+            <td className="py-3 px-6 text-center">₱{parseFloat(order.total_amount).toFixed(2)}</td>
             <td className="py-3 px-6 text-center">
               <span
                 className={`py-1 px-3 rounded-full text-xs font-semibold ${
@@ -36,6 +45,7 @@ const OrderManagementTable = ({ orders }) => (
                 {order.status}
               </span>
             </td>
+            {/* MOVED Data Cell */}
             <td className="py-3 px-6 text-left">{new Date(order.order_date).toLocaleString()}</td>
           </tr>
         ))}
@@ -52,7 +62,9 @@ function AdminPage() {
   const [currentView, setCurrentView] = useState('orders');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [menuFilterCategory, setMenuFilterCategory] = useState('All');
 
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -138,13 +150,25 @@ const openModalForEdit = (item) => {
     setEditingItem(null);
   };
 
+  const handleMenuFilterChange = (category) => {
+    setMenuFilterCategory(category);
+  };
+
+  const handleClearMenuFilters = () => {
+    setMenuFilterCategory('All');
+  };
+
   // ... (loading/error checks)
-  
-  
   if (loading) return <div className="p-8">Loading dashboard...</div>;
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
   
   const uniqueCategories = ['All', ...new Set(menuItems.map(item => item.category))];
+  const allCategories = ['All', ...new Set(menuItems.map(item => item.category))];
+  const categoriesForForm = allCategories.filter(c => c !== 'All'); // Exclude 'All' for the Add/Edit form
+
+  const filteredMenuItems = menuItems.filter(item => 
+    menuFilterCategory === 'All' || item.category === menuFilterCategory
+  );
 
    return (
     <div className="container mx-auto px-4 py-8">
@@ -179,8 +203,15 @@ const openModalForEdit = (item) => {
         {currentView === 'orders' && <OrderManagementTable orders={orders} />}
         {currentView === 'menu' && (
           <MenuManagementTable
-            items={menuItems}
-            // --- FIX: Pass the correct functions ---
+            // Pass the filtered list and total count
+            items={filteredMenuItems} 
+            totalItems={filteredMenuItems.length} 
+            // Pass categories for the filter dropdown
+            categories={allCategories} 
+            selectedCategory={menuFilterCategory}
+            onFilterChange={handleMenuFilterChange}
+            onClearFilters={handleClearMenuFilters}
+            // Pass modal handlers
             onAddItem={openModalForAdd}
             onEditItem={openModalForEdit}
             onDeleteItem={handleDeleteItem}

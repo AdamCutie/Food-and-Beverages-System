@@ -14,9 +14,18 @@ function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  const [orderType, setOrderType] = useState('Dine-in');
+  const [instructions, setInstructions] = useState('');
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const categories = ['All', ...new Set(items.map(item => item.category))];
-  const [selectedImage, setSelectedImage] = useState(null);
+
+  useEffect(() => {
+    setDeliveryLocation('');
+  }, [orderType]);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -44,11 +53,8 @@ function MenuPage() {
     setIsCartOpen(!isCartOpen);
   };
 
-
-
   const filteredItems = items
     .filter(item => selectedCategory === 'All' || item.category === selectedCategory)
-    // --- THIS IS THE LINE THAT WAS FIXED ---
     .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleSelectCategory = (category) => {
@@ -69,9 +75,13 @@ function MenuPage() {
     });
   };
 
+  const handleRemoveItem = (itemIdToRemove) => {
+    setCartItems(prevItems => prevItems.filter(item => item.item_id !== itemIdToRemove));
+  };
+
   const handleUpdateQuantity = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
-      setCartItems((prevItems) => prevItems.filter((item) => item.item_id !== itemId));
+      handleRemoveItem(itemId);
     } else {
       setCartItems((prevItems) =>
         prevItems.map((item) =>
@@ -81,22 +91,24 @@ function MenuPage() {
     }
   };
 
-  const handlePlaceOrder = async () => {
-    if (cartItems.length === 0) {
-      alert("Your cart is empty!");
+  // --- THIS FUNCTION IS UPDATED ---
+  const handlePlaceOrder = async (grandTotal) => { // Accept grandTotal as argument
+    if (cartItems.length === 0 || !deliveryLocation) {
+      alert("Please ensure your cart has items and you've entered a table/room number.");
       return;
     }
-    const totalPrice = cartItems.reduce(
-      (total, item) => total + item.price * item.quantity,
-      0
-    );
+    // No need to recalculate total price here, we already have grandTotal
+
     const orderData = {
       customer_id: 1,
-      total_price: totalPrice,
+      total_price: grandTotal, // Use the grandTotal passed from CartPanel
+      order_type: orderType,
+      instructions: instructions,
+      delivery_location: deliveryLocation,
       items: cartItems.map(item => ({
         item_id: item.item_id,
         quantity: item.quantity,
-        price: item.price
+        price: item.price // Send the original price per item
       }))
     };
     try {
@@ -111,44 +123,52 @@ function MenuPage() {
       }
       alert('Order placed successfully!');
       setCartItems([]);
+      setInstructions('');
+      setDeliveryLocation('');
     } catch (err) {
       console.error('Error placing order:', err);
       alert(`Error: ${err.message}`);
     }
   };
-
+  // --- END OF UPDATED FUNCTION ---
 
   return (
     <div className="bg-gray-100 min-h-screen">
-      <HeaderBar 
-        cartCount={cartCount} 
+      <HeaderBar
+        cartCount={cartCount}
         onCartToggle={toggleCart}
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
       />
-      {/* The 'container' class will handle the centering */}
       <main className="container mx-auto px-4 py-8">
-        <div> {/* This div wraps the main content */}
+        <div>
           <PromoBanner />
-          <CategoryTabs 
+          <CategoryTabs
             categories={categories}
             selectedCategory={selectedCategory}
             onSelectCategory={handleSelectCategory}
           />
-          <FoodGrid 
-            items={filteredItems} 
+          <FoodGrid
+            items={filteredItems}
             onAddToCart={handleAddToCart}
-            onImageClick={(imageUrl) => setSelectedImage(imageUrl)} // Pass the handler
+            onImageClick={(imageUrl) => setSelectedImage(imageUrl)}
           />
         </div>
       </main>
 
-      <CartPanel 
-        cartItems={cartItems} 
-        onUpdateQuantity={handleUpdateQuantity} 
-        onPlaceOrder={handlePlaceOrder}
+      <CartPanel
+        cartItems={cartItems}
+        onUpdateQuantity={handleUpdateQuantity}
+        onPlaceOrder={handlePlaceOrder} // This now expects grandTotal
         isOpen={isCartOpen}
         onClose={toggleCart}
+        orderType={orderType}
+        setOrderType={setOrderType}
+        instructions={instructions}
+        setInstructions={setInstructions}
+        onRemoveItem={handleRemoveItem}
+        deliveryLocation={deliveryLocation}
+        setDeliveryLocation={setDeliveryLocation}
       />
 
       <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
