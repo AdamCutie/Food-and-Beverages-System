@@ -1,4 +1,6 @@
 import pool from "../config/mysql.js";
+import { validateStock, adjustStock } from "./itemController.js"; 
+
 
 // @desc    Create a new order
 // @route   POST /api/orders
@@ -36,6 +38,9 @@ export const createOrder = async (req, res) => {
             const stockSql = "UPDATE menu_items SET stock = stock - ? WHERE item_id = ?";
             await connection.query(stockSql, [item.quantity, item.item_id]);
         }
+        
+        // Step 4: Adjust stock using the helper function
+        await adjustStock(items, 'deduct', connection);
 
         await connection.commit();
         res.status(201).json({ order_id, message: "Order created successfully" });
