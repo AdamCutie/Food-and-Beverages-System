@@ -62,7 +62,9 @@ function AdminPage() {
   const [currentView, setCurrentView] = useState('orders');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [menuFilterCategory, setMenuFilterCategory] = useState('All');
 
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -148,13 +150,25 @@ const openModalForEdit = (item) => {
     setEditingItem(null);
   };
 
+  const handleMenuFilterChange = (category) => {
+    setMenuFilterCategory(category);
+  };
+
+  const handleClearMenuFilters = () => {
+    setMenuFilterCategory('All');
+  };
+
   // ... (loading/error checks)
-  
-  
   if (loading) return <div className="p-8">Loading dashboard...</div>;
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
   
   const uniqueCategories = ['All', ...new Set(menuItems.map(item => item.category))];
+  const allCategories = ['All', ...new Set(menuItems.map(item => item.category))];
+  const categoriesForForm = allCategories.filter(c => c !== 'All'); // Exclude 'All' for the Add/Edit form
+
+  const filteredMenuItems = menuItems.filter(item => 
+    menuFilterCategory === 'All' || item.category === menuFilterCategory
+  );
 
    return (
     <div className="container mx-auto px-4 py-8">
@@ -189,8 +203,15 @@ const openModalForEdit = (item) => {
         {currentView === 'orders' && <OrderManagementTable orders={orders} />}
         {currentView === 'menu' && (
           <MenuManagementTable
-            items={menuItems}
-            // --- FIX: Pass the correct functions ---
+            // Pass the filtered list and total count
+            items={filteredMenuItems} 
+            totalItems={filteredMenuItems.length} 
+            // Pass categories for the filter dropdown
+            categories={allCategories} 
+            selectedCategory={menuFilterCategory}
+            onFilterChange={handleMenuFilterChange}
+            onClearFilters={handleClearMenuFilters}
+            // Pass modal handlers
             onAddItem={openModalForAdd}
             onEditItem={openModalForEdit}
             onDeleteItem={handleDeleteItem}
