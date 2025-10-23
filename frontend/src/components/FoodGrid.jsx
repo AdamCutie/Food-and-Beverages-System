@@ -24,7 +24,7 @@ const FoodGrid = ({ items, onAddToCart, onImageClick }) => {
             <h3 className="text-xl font-bold text-gray-800 mb-2">{item.item_name}</h3>
             <div className="mt-auto flex justify-between items-center">
               <p className="text-2xl font-semibold text-gray-900">
-                ${parseFloat(item.price).toFixed(2)}
+                ₱{parseFloat(item.price).toFixed(2)}
               </p>
               <button
                 onClick={() => onAddToCart(item)}

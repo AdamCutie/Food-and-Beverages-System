@@ -103,7 +103,7 @@ const CartPanel = ({
                   <div key={item.item_id} className="flex justify-between items-center">
                     <div>
                       <p className="font-semibold">{item.item_name}</p>
-                      <p className="text-sm text-gray-500">${parseFloat(item.price).toFixed(2)}</p>
+                      <p className="text-sm text-gray-500">₱{parseFloat(item.price).toFixed(2)}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button onClick={() => onUpdateQuantity(item.item_id, item.quantity - 1)} className="bg-gray-200 w-6 h-6 rounded-md font-bold hover:bg-gray-300">-</button>
@@ -129,19 +129,19 @@ const CartPanel = ({
             <div className="border-t pt-4 mt-4 space-y-2">
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Subtotal</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>₱{subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Service Charge ({ (SERVICE_RATE * 100).toFixed(0) }%)</span>
-                <span>${serviceAmount.toFixed(2)}</span>
+                <span>₱{serviceAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm text-gray-600">
                 <span>VAT ({ (VAT_RATE * 100).toFixed(0) }%)</span>
-                <span>${vatAmount.toFixed(2)}</span>
+                <span>₱{vatAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold text-lg pt-2 border-t mt-2">
                 <span>Total amount</span>
-                <span>${grandTotal.toFixed(2)}</span>
+                <span>₱{grandTotal.toFixed(2)}</span>
               </div>
               <button
                 onClick={handlePlaceOrderClick} // Use the new handler

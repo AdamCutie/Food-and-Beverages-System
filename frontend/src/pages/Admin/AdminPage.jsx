@@ -12,9 +12,14 @@ const OrderManagementTable = ({ orders }) => (
       <thead>
         <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
           <th className="py-3 px-6 text-left">Order ID</th>
-          <th className="py-3 px-6 text-left">Customer ID</th>
-          <th className="py-3 px-6 text-center">Total Amount</th>
+          <th className="py-3 px-6 text-left">Cust. ID</th>
+          {/* NEW Columns */}
+          <th className="py-3 px-6 text-left">Type</th>
+          <th className="py-3 px-6 text-left">Location</th>
+          {/* --- */}
+          <th className="py-3 px-6 text-center">Total</th>
           <th className="py-3 px-6 text-center">Status</th>
+          {/* MOVED Column */}
           <th className="py-3 px-6 text-left">Date</th>
         </tr>
       </thead>
@@ -23,7 +28,11 @@ const OrderManagementTable = ({ orders }) => (
           <tr key={order.order_id} className="border-b border-gray-200 hover:bg-gray-50">
             <td className="py-3 px-6 text-left whitespace-nowrap">{order.order_id}</td>
             <td className="py-3 px-6 text-left">{order.customer_id}</td>
-            <td className="py-3 px-6 text-center">${parseFloat(order.total_amount).toFixed(2)}</td>
+            {/* NEW Data Cells */}
+            <td className="py-3 px-6 text-left">{order.order_type}</td>
+            <td className="py-3 px-6 text-left">{order.delivery_location}</td>
+            {/* --- */}
+            <td className="py-3 px-6 text-center">₱{parseFloat(order.total_amount).toFixed(2)}</td>
             <td className="py-3 px-6 text-center">
               <span
                 className={`py-1 px-3 rounded-full text-xs font-semibold ${
@@ -36,6 +45,7 @@ const OrderManagementTable = ({ orders }) => (
                 {order.status}
               </span>
             </td>
+            {/* MOVED Data Cell */}
             <td className="py-3 px-6 text-left">{new Date(order.order_date).toLocaleString()}</td>
           </tr>
         ))}
