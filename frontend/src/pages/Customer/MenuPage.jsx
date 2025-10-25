@@ -7,6 +7,12 @@ import FoodGrid from '../../components/FoodGrid';
 import CartPanel from '../../components/CartPanel';
 import ImageModal from '../../components/ImageModal';
 
+//temporary color object
+const primaryColor = {
+  backgroundColor: '#0B3D2E'
+}
+
+
 function MenuPage() {
   const [items, setItems] = useState([]);
   const [error, setError] = useState(null);
@@ -133,7 +139,7 @@ function MenuPage() {
   // --- END OF UPDATED FUNCTION ---
 
   return (
-    <div className="bg-gray-100 min-h-screen">
+    <div className="bg-gray-100 min-h-screen" style={primaryColor}>
       <HeaderBar
         cartCount={cartCount}
         onCartToggle={toggleCart}

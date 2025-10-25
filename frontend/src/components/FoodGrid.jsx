@@ -1,14 +1,24 @@
 import React from 'react';
 
+//temporary color objects
+const primaryColor = {
+  backgroundColor: '#0B3D2E'
+}
+
+const secondaryColor = {
+  backgroundColor: '#fff2e0'
+}
+
+
 const FoodGrid = ({ items, onAddToCart, onImageClick }) => {
   if (!items || items.length === 0) {
     return <p className="text-center mt-12 text-gray-500">No items match your search.</p>;
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mt-8" >
       {items.map((item) => (
-        <div key={item.item_id} className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+        <div key={item.item_id} className="rounded-lg shadow-lg overflow-hidden flex flex-col" style={secondaryColor}>
           <div className="relative">
             {/* --- THIS IS THE FIX --- */}
             {/* We prepend the backend server address to the image URL */}
@@ -28,7 +38,8 @@ const FoodGrid = ({ items, onAddToCart, onImageClick }) => {
               </p>
               <button
                 onClick={() => onAddToCart(item)}
-                className="bg-orange-500 text-white font-bold py-2 px-6 rounded-full hover:bg-orange-600 transition-transform transform hover:scale-105"
+                style={primaryColor}
+                className="text-white font-bold py-2 px-6 rounded-full hover:bg-orange-600 transition-transform transform hover:scale-105"
               >
                 Add
               </button>

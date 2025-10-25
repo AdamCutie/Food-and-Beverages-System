@@ -6,7 +6,7 @@ export default {
       colors: {
         primary: "#0B3D2E", // dark teal
         accent: "#F9A825", // golden accent
-        beige: "#FDF6EC", // cart background
+        beige: "#fff2e0", // cart background
         text: "#053A34", // main text color
       },
       fontFamily: {

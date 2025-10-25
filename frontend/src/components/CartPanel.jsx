@@ -1,6 +1,15 @@
 import React from 'react';
 import { X, Trash2 } from 'lucide-react';
 
+//temporary color objects
+const primaryColor = {
+  backgroundColor: '#0B3D2E'
+}
+
+const secondaryColor = {
+  backgroundColor: '#fff2e0'
+}
+
 const CartPanel = ({
   cartItems = [],
   onUpdateQuantity,
@@ -44,7 +53,7 @@ const CartPanel = ({
       />
 
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-lg z-30 transform transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-orange-50 shadow-lg z-30 transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -58,11 +67,11 @@ const CartPanel = ({
           </div>
 
           {/* Order Type Buttons */}
-          <div className="flex gap-2 mb-4">
+          <div className="flex gap-2 mb-4" >
             <button
               onClick={() => setOrderType('Dine-in')}
               className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
-                orderType === 'Dine-in' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-700'
+                orderType === 'Dine-in' ? 'bg-green-900 text-white' : 'bg-gray-200 text-gray-700'
               }`}
             >
               Dine-in
@@ -70,7 +79,7 @@ const CartPanel = ({
             <button
               onClick={() => setOrderType('Room Service')}
               className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
-                orderType === 'Room Service' ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-700'
+                orderType === 'Room Service' ? 'bg-green-900 text-white' : 'bg-gray-200 text-gray-700'
               }`}
             >
               Room Service
@@ -146,7 +155,7 @@ const CartPanel = ({
               <button
                 onClick={handlePlaceOrderClick} // Use the new handler
                 disabled={cartItems.length === 0 || !deliveryLocation}
-                className="w-full mt-4 bg-green-500 text-white font-bold py-3 rounded-lg hover:bg-green-600 transition-colors disabled:bg-gray-400"
+                className="w-full mt-4 bg-green-900 text-white font-bold py-3 rounded-lg hover:bg-green-800 transition-colors disabled:bg-gray-400"
               >
                 Place Order
               </button>

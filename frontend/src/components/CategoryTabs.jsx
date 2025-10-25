@@ -9,8 +9,8 @@ const CategoryTabs = ({ categories, selectedCategory, onSelectCategory }) => {
             onClick={() => onSelectCategory(category)}
             className={`py-2 px-4 text-lg font-semibold transition-colors whitespace-nowrap ${
               selectedCategory === category
-                ? 'border-b-2 border-orange-500 text-orange-500'
-                : 'text-gray-500 hover:text-orange-500'
+                ? 'border-b-2 border-orange-500 text-orange-300'
+                : 'text-orange-300 hover:text-orange-300'
             }`}
           >
             {category}
