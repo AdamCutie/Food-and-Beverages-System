@@ -35,16 +35,16 @@ export const getItemById = async (req, res) => {
 // @access  Admin
 export const createMenuItem = async (req, res) => {
     // --- CHANGE: Add image_url to the destructuring ---
-    const { item_name, category, price, stock, image_url } = req.body;
+    const { item_name, category, price, stock, image_url, description} = req.body;
 
-    if (!item_name || !category || !price || stock === undefined) {
+    if (!item_name || !category || !price || stock === undefined || !description) {
         return res.status(400).json({ message: 'Please provide all required fields.' });
     }
 
     try {
         // --- CHANGE: Add image_url to the INSERT statement ---
-        const sql = "INSERT INTO menu_items (item_name, category, price, stock, image_url, desctription) VALUES (?, ?, ?, ?, ?)";
-        const [result] = await pool.query(sql, [item_name, category, price, stock, image_url]);
+        const sql = "INSERT INTO menu_items (item_name, category, price, stock, image_url, description) VALUES (?, ?, ?, ?, ?, ?)";
+        const [result] = await pool.query(sql, [item_name, category, price, stock, image_url, description]);
 
         const newItemId = result.insertId;
         const [newItem] = await pool.query("SELECT * FROM menu_items WHERE item_id = ?", [newItemId]);
