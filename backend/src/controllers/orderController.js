@@ -131,3 +131,28 @@ export const updateOrderStatus = async (req, res) => {
         connection.release();
     }
 };
+
+
+// Test for Kitchen Orders
+
+export const getKitchenOrders = async (req, res) => {
+    try {
+        // Select orders where status is 'Pending', ordered by oldest first
+        // Also include customer name
+        const sql = `
+            SELECT o.*, c.first_name, c.last_name 
+            FROM orders o
+            JOIN customers c ON o.customer_id = c.customer_id
+            WHERE o.status = 'Pending' 
+            ORDER BY o.order_date ASC
+        `;
+        const [orders] = await pool.query(sql);
+
+        // We will fetch details separately on the frontend if needed
+        res.json(orders);
+
+    } catch (error) {
+        console.error("Error fetching kitchen orders:", error);
+        res.status(500).json({ message: "Error fetching kitchen orders", error: error.message });
+    }
+};
