@@ -137,16 +137,13 @@ export const updateOrderStatus = async (req, res) => {
 
 export const getKitchenOrders = async (req, res) => {
     try {
-        // --- THIS IS THE FIX ---
-        // We now select all orders that are NOT Completed or Cancelled.
         const sql = `
             SELECT o.*, c.first_name, c.last_name 
             FROM orders o
             JOIN customers c ON o.customer_id = c.customer_id
-            WHERE o.status IN ('pending', 'preparing', 'ready', 'served') 
-            ORDER BY o.order_date ASC
+            WHERE o.status IN ('Pending', 'Preparing', 'Ready') 
+            ORDER BY o.order_date DESC 
         `;
-        // --- END OF FIX ---
         
         const [orders] = await pool.query(sql);
         
@@ -155,5 +152,22 @@ export const getKitchenOrders = async (req, res) => {
     } catch (error) {
         console.error("Error fetching kitchen orders:", error); 
         res.status(500).json({ message: "Error fetching kitchen orders", error: error.message });
+    }
+};
+
+export const getServedOrders = async (req, res) => {
+    try {
+        const sql = `
+            SELECT o.*, c.first_name, c.last_name 
+            FROM orders o
+            JOIN customers c ON o.customer_id = c.customer_id
+            WHERE o.status = 'Served' OR o.status = 'Completed'
+            ORDER BY o.order_date DESC
+        `;
+        const [orders] = await pool.query(sql);
+        res.json(orders);
+    } catch (error) {
+        console.error("Error fetching served orders:", error);
+        res.status(500).json({ message: "Error fetching served orders", error: error.message });
     }
 };

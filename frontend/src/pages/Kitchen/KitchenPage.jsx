@@ -1,4 +1,3 @@
-// frontend/src/pages/Kitchen/KitchenPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -9,6 +8,7 @@ function KitchenPage() {
   const [loading, setLoading] = useState(true);
   const [isPolling, setIsPolling] = useState(false);
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterType, setFilterType] = useState('All Types');
 
   const fetchOrderDetails = async (orderId) => {
     try {
@@ -25,63 +25,64 @@ function KitchenPage() {
   };
 
   const fetchAndPopulateOrders = async (isInitialLoad = false) => {
-    if (!isInitialLoad && isPolling) return;
-    if (isInitialLoad) setLoading(true);
-    setIsPolling(true);
-    setError(null);
+      if (!isInitialLoad && isPolling) return;
+      if (isInitialLoad) setLoading(true);
+      setIsPolling(true);
+      setError(null);
 
-    try {
-      const listResponse = await fetch('http://localhost:3000/api/orders/kitchen');
-      if (!listResponse.ok) {
-        throw new Error('Failed to fetch kitchen orders list');
-      }
-      const ordersList = await listResponse.json();
-
-      const ordersWithDetails = await Promise.all(
-        ordersList.map(order => fetchOrderDetails(order.order_id))
-      );
-      
-      const newOrders = ordersWithDetails.filter(order => order !== null);
-
-      // --- THIS FIXES THE FLICKER ---
-      // We only update the state if the data *actually* changed
-      setKitchenOrders(prevOrders => {
-        // Create simple strings of IDs and statuses to compare
-        const prevDataString = JSON.stringify(prevOrders.map(o => ({ id: o.order_id, status: o.status })));
-        const newDataString = JSON.stringify(newOrders.map(o => ({ id: o.order_id, status: o.status })));
-        
-        if (prevDataString !== newDataString) {
-          return newOrders; // The data is different, update the state
+      try {
+        const listResponse = await fetch('http://localhost:3000/api/orders/kitchen');
+        if (!listResponse.ok) {
+          throw new Error('Failed to fetch kitchen orders list');
         }
-        return prevOrders; // The data is the same, do nothing (prevents flicker)
-      });
+        const ordersList = await listResponse.json();
 
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      if (isInitialLoad) setLoading(false);
-      setIsPolling(false);
-    }
-  };
+        if (!Array.isArray(ordersList)) {
+            console.error("API did not return an array, received:", ordersList);
+            throw new Error("Invalid data from server.");
+        }
 
-  // --- THIS FIXES THE STATUS INCONSISTENCY ---
+        const ordersWithDetails = await Promise.all(
+          ordersList.map(order => fetchOrderDetails(order.order_id))
+        );
+        
+        const newOrders = ordersWithDetails.filter(order => order !== null);
+        
+        if (Array.isArray(newOrders)) {
+            setKitchenOrders(newOrders);
+        } else {
+            console.error("Error: newOrders is not an array.", newOrders);
+            setKitchenOrders([]); 
+        }
+      } catch (err) {
+        setError(err.message);
+        setKitchenOrders([]);
+      } finally {
+        if (isInitialLoad) setLoading(false);
+        setIsPolling(false);
+      }
+    };
+
+  // --- THIS IS THE RESTORED FUNCTION ---
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      // All statuses are sent as lowercase
       const response = await fetch(`http://localhost:3000/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus.toLowerCase() }), // Send lowercase
+        body: JSON.stringify({ status: newStatus.toLowerCase() }),
       });
 
       if (!response.ok) {
         let errorMsg = `Failed to update status to ${newStatus}`;
-        try { const errorData = await response.json(); errorMsg = errorData.message || errorMsg; } catch(e) {}
+        try { const errorData = await response.json(); errorMsg = errorData.message || errorData.error || errorMsg; } catch(e) {}
         throw new Error(errorMsg);
       }
 
       setKitchenOrders(currentOrders => {
-        // Check for lowercase statuses
+        if (!Array.isArray(currentOrders)) {
+            console.error("Error: kitchenOrders state was not an array during update.");
+            return []; 
+        }
         if (newStatus.toLowerCase() === 'served' || newStatus.toLowerCase() === 'cancelled') {
           return currentOrders.filter(order => order.order_id !== orderId);
         } else {
@@ -96,6 +97,7 @@ function KitchenPage() {
       toast.error(err.message);
     }
   };
+  // --- END OF RESTORED FUNCTION ---
 
   useEffect(() => {
     fetchAndPopulateOrders(true);
@@ -113,56 +115,65 @@ function KitchenPage() {
     return <div className="p-8 text-center text-red-500">Error: {error}</div>;
   }
 
-  const filteredOrders = kitchenOrders.filter(order => {
-    if (filterStatus === 'All') {
-      return true;
-    }
-    return order.status.toLowerCase() === filterStatus.toLowerCase();
-  });
-
-  const FilterButton = ({ status }) => {
-    const isActive = filterStatus.toLowerCase() === status.toLowerCase();
-    const count = status === 'All' 
-      ? kitchenOrders.length 
-      : kitchenOrders.filter(o => o.status.toLowerCase() === status.toLowerCase()).length;
-
-    return (
-      <button
-        onClick={() => setFilterStatus(status)}
-        className={`py-2 px-4 rounded-md font-semibold text-sm transition-colors ${
-          isActive 
-            ? 'bg-figma-dark-green text-white' 
-            : 'bg-white text-gray-700 hover:bg-gray-100'
-        }`}
-      >
-        {status} ({count})
-      </button>
-    );
-  };
-
+  const filteredOrders = Array.isArray(kitchenOrders) ? kitchenOrders.filter(order => {
+    const statusMatch = filterStatus === 'All' || (order.status && order.status.toLowerCase() === filterStatus.toLowerCase());
+    const typeMatch = filterType === 'All Types' || (order.order_type && order.order_type.toLowerCase() === filterType.toLowerCase());
+    return statusMatch && typeMatch;
+  }) : []; // Ensure filteredOrders is always an array
   return (
-    <div className="bg-figma-cream min-h-screen px-4 py-8">
+    <div className="bg-figma-cream min-h-screen px-4 py-8 text-figma-dark-green">
       <div className="container mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center text-figma-dark-green">Kitchen Order Display</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">Kitchen Order Display</h1>
+        
+        {error && <p className="text-center text-red-500 text-sm mb-4">Error fetching updates: {error}</p>}
 
-        <div className="flex justify-center gap-2 mb-6">
-          <FilterButton status="All" />
-          <FilterButton status="Pending" />
-          <FilterButton status="Preparing" />
-          <FilterButton status="Ready" />
-          {/* Note: "Served" will not appear here as it's removed from the kitchenOrders list */}
+        {/* --- NEW: Dropdown Filters Container --- */}
+        <div className="bg-figma-off-white p-4 rounded-lg shadow-md mb-6 flex flex-col md:flex-row justify-around items-center gap-4">
+          {/* Filter by Status Dropdown */}
+          <div className="flex flex-col w-full md:w-1/2 lg:w-1/3">
+            <label htmlFor="status-filter" className="text-sm font-semibold mb-1">Filter by Status</label>
+            <select
+              id="status-filter"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="p-2 border border-gray-300 rounded-md bg-white text-gray-800 shadow-sm focus:ring-figma-dark-green focus:border-figma-dark-green"
+            >
+              <option value="All">All</option>
+              <option value="Pending">Pending</option>
+              <option value="Preparing">Preparing</option>
+              <option value="Ready">Ready</option>
+              {/* Served orders are removed from kitchenOrders, so they won't appear here */}
+            </select>
+          </div>
+
+          {/* Filter by Type Dropdown */}
+          <div className="flex flex-col w-full md:w-1/2 lg:w-1/3">
+            <label htmlFor="type-filter" className="text-sm font-semibold mb-1">Filter by Type</label>
+            <select
+              id="type-filter"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="p-2 border border-gray-300 rounded-md bg-white text-gray-800 shadow-sm focus:ring-figma-dark-green focus:border-figma-dark-green"
+            >
+              <option value="All Types">All Types</option>
+              <option value="Dine-in">Dine-in</option>
+              <option value="Room Service">Room Service</option>
+            </select>
+          </div>
         </div>
 
-        {filteredOrders.length === 0 ? ( // <-- CHECK filteredOrders
+        {filteredOrders.length === 0 ? (
           <p className="text-center text-gray-500 mt-10">
-            {filterStatus === 'All' ? 'No active orders.' : `No ${filterStatus} orders.`}
+            No {filterStatus !== 'All' ? filterStatus.toLowerCase() + ' ' : ''}
+            {filterType !== 'All Types' ? filterType.toLowerCase() + ' ' : ''}
+            orders.
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredOrders.map(order => ( // <-- MAP filteredOrders
+            {filteredOrders.map(order => (
               <div key={order.order_id} className="p-4 rounded-lg shadow-md bg-white flex flex-col h-full">
                 <div className="mb-3 border-b pb-2">
-                  <h2 className="font-bold text-lg text-figma-dark-green">Order #{order.order_id}</h2>
+                  <h2 className="font-bold text-lg">Order #{order.order_id}</h2>
                   <p className="text-xs text-gray-500">Time: {new Date(order.order_date).toLocaleTimeString()}</p>
                   <p className="text-sm">Type: <span className="font-medium">{order.order_type}</span></p>
                   <p className="text-sm">Location: <span className="font-medium">{order.delivery_location}</span></p>
@@ -170,7 +181,7 @@ function KitchenPage() {
                 </div>
 
                 <div className="space-y-2 mb-3 flex-grow overflow-y-auto max-h-48 pr-1">
-                  <h3 className="font-semibold text-figma-dark-green">Items:</h3>
+                  <h3 className="font-semibold">Items:</h3>
                   {order.details && order.details.length > 0 ? (
                     order.details.map(item => (
                       <div key={item.detail_id} className="text-sm ml-2">
@@ -183,7 +194,6 @@ function KitchenPage() {
                   )}
                 </div>
 
-                 {/* --- STATUS DISPLAY (standardized to lowercase) --- */}
                  <div className="text-center mb-3">
                    <span className={`py-1 px-3 rounded-full text-xs font-semibold ${
                         order.status.toLowerCase() === 'pending' ? 'bg-yellow-200 text-yellow-800' :
@@ -196,12 +206,11 @@ function KitchenPage() {
                     </span>
                  </div>
 
-                {/* --- ACTION BUTTONS (standardized to lowercase) --- */}
                 <div className="mt-auto pt-4 border-t flex flex-col gap-2">
                   {order.status.toLowerCase() === 'pending' && (
                     <button
                       onClick={() => handleUpdateStatus(order.order_id, 'Preparing')}
-                      className="bg-figma-light-green text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-opacity-90 transition-colors w-full"
+                      className="bg-green-900 text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-opacity-90 transition-colors w-full"
                     >
                       Accept (Prepare)
                     </button>
@@ -217,7 +226,7 @@ function KitchenPage() {
                   {order.status.toLowerCase() === 'ready' && (
                     <button
                       onClick={() => handleUpdateStatus(order.order_id, 'Served')}
-                      className="bg-figma-orange text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-opacity-90 transition-colors w-full"
+                      className="bg-orange-500 text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-opacity-90 transition-colors w-full"
                     >
                       Mark as Served
                     </button>

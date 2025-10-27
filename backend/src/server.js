@@ -22,9 +22,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Apply the general API rate limiter to all requests starting with /api
-app.use("/api/", apiLimiter);
-
 // Test DB Connection
 app.get("/api/health", async (req, res) => {
   try {
@@ -35,12 +32,17 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+// Para di tamaan ng Rate limiter middleware
+app.use("/api/orders", orderRoutes);
+
+// Apply the general API rate limiter to all requests starting with /api
+app.use("/api/", apiLimiter);
 
 // API routes
 // Apply the stricter auth limiter specifically to auth routes
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/items", itemRoutes);
-app.use("/api/orders", orderRoutes);
+
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 
