@@ -7,13 +7,15 @@ import pool from "../config/mysql.js";
 // @access  Public
 export const registerUser = async (req, res) => {
   try {
-    const { full_name, email, password, phone, role = "customer" } = req.body;
+    // --- FIX: Read first_name and last_name ---
+    const { first_name, last_name, email, password, phone, role = "customer" } = req.body;
 
     // Validate essential fields
-    if (!full_name || !email || !password) {
+    // --- FIX: Validate new fields ---
+    if (!first_name || !last_name || !email || !password) {
       return res
         .status(400)
-        .json({ message: "Full name, email, and password are required" });
+        .json({ message: "First name, last name, email, and password are required" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -27,8 +29,10 @@ export const registerUser = async (req, res) => {
       }
 
       // Insert new customer into the database
-      const sql = "INSERT INTO customers (full_name, email, password, phone) VALUES (?, ?, ?, ?)";
-      const [result] = await pool.query(sql, [full_name, email, hashedPassword, phone || null]);
+      // --- FIX: Use correct columns in SQL query ---
+      const sql = "INSERT INTO customers (first_name, last_name, email, password, phone) VALUES (?, ?, ?, ?, ?)";
+      // --- FIX: Pass new fields to query ---
+      const [result] = await pool.query(sql, [first_name, last_name, email, hashedPassword, phone || null]);
       
       return res.status(201).json({ customer_id: result.insertId, message: "Customer registered successfully" });
 
@@ -39,9 +43,15 @@ export const registerUser = async (req, res) => {
         return res.status(400).json({ message: "Staff member with this email already exists" });
       }
 
+      // NOTE: The staff table *does* use full_name.
+      // We must check for 'full_name' for staff roles.
+      if (!req.body.full_name) {
+         return res.status(400).json({ message: "Staff registration requires 'full_name'" });
+      }
+
       // Insert new staff member into the database
       const sql = "INSERT INTO staff (full_name, email, password, role) VALUES (?, ?, ?, ?)";
-      const [result] = await pool.query(sql, [full_name, email, hashedPassword, role]);
+      const [result] = await pool.query(sql, [req.body.full_name, email, hashedPassword, role]);
       
       return res.status(201).json({ staff_id: result.insertId, message: "Staff member registered successfully" });
 
