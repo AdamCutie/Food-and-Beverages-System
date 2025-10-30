@@ -1,6 +1,4 @@
-import React from 'react';
-import { useState, useEffect } from 'react';
-// --- 1. IMPORT useAuth and useNavigate ---
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import HeaderBar from '../../components/HeaderBar';
@@ -9,8 +7,8 @@ import CategoryTabs from '../../components/CategoryTabs';
 import FoodGrid from '../../components/FoodGrid';
 import CartPanel from '../../components/CartPanel';
 import ImageModal from '../../components/ImageModal';
-import PaymentModal from '../../components/PaymentModal'; 
-import ReceiptModal from '../../components/ReceiptModal'; 
+import PaymentModal from '../../components/PaymentModal';
+import ReceiptModal from '../../components/ReceiptModal';
 import toast from 'react-hot-toast';
 
 const primaryColor = { backgroundColor: '#0B3D2E' };
@@ -30,25 +28,21 @@ function MenuPage() {
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [pendingOrderTotal, setPendingOrderTotal] = useState(0); 
-  const [receiptDetails, setReceiptDetails] = useState(null); 
+  const [pendingOrderTotal, setPendingOrderTotal] = useState(0);
+  const [receiptDetails, setReceiptDetails] = useState(null);
 
-  // --- 2. GET AUTH STATE AND NAVIGATION ---
   const { user, token, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-
 
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
   const categories = ['All', ...new Set(items.map(item => item.category))];
 
   useEffect(() => { setDeliveryLocation(''); }, [orderType]);
   useEffect(() => {
-    const fetchItems = async () => { 
-       try {
+    const fetchItems = async () => {
+      try {
         const response = await fetch('http://localhost:3000/api/items');
-        if (!response.ok) {
-          throw new Error('Failed to fetch data from the server.');
-        }
+        if (!response.ok) throw new Error('Failed to fetch data from the server.');
         const data = await response.json();
         setItems(data);
       } catch (err) {
@@ -59,14 +53,15 @@ function MenuPage() {
     fetchItems();
   }, []);
 
-  const handleSearchChange = (event) => { setSearchTerm(event.target.value); };
-  const toggleCart = () => { setIsCartOpen(!isCartOpen); };
-  const handleSelectCategory = (category) => { setSelectedCategory(category); };
-  const handleAddToCart = (clickedItem) => { 
-      setCartItems((prevItems) => {
-      const isItemInCart = prevItems.find((item) => item.item_id === clickedItem.item_id);
+  const handleSearchChange = (e) => setSearchTerm(e.target.value);
+  const toggleCart = () => setIsCartOpen(!isCartOpen);
+  const handleSelectCategory = (category) => setSelectedCategory(category);
+
+  const handleAddToCart = (clickedItem) => {
+    setCartItems(prevItems => {
+      const isItemInCart = prevItems.find(item => item.item_id === clickedItem.item_id);
       if (isItemInCart) {
-        return prevItems.map((item) =>
+        return prevItems.map(item =>
           item.item_id === clickedItem.item_id
             ? { ...item, quantity: item.quantity + 1 }
             : item
@@ -74,52 +69,49 @@ function MenuPage() {
       }
       return [...prevItems, { ...clickedItem, quantity: 1 }];
     });
-   };
-  const handleRemoveItem = (itemIdToRemove) => { 
+  };
+
+  const handleRemoveItem = (itemIdToRemove) => {
     setCartItems(prevItems => prevItems.filter(item => item.item_id !== itemIdToRemove));
-   };
-  const handleUpdateQuantity = (itemId, newQuantity) => { 
-      if (newQuantity <= 0) {
+  };
+
+  const handleUpdateQuantity = (itemId, newQuantity) => {
+    if (newQuantity <= 0) {
       handleRemoveItem(itemId);
     } else {
-      setCartItems((prevItems) =>
-        prevItems.map((item) =>
+      setCartItems(prevItems =>
+        prevItems.map(item =>
           item.item_id === itemId ? { ...item, quantity: newQuantity } : item
         )
       );
     }
-   };
+  };
 
-  // --- 3. UPDATE: This function now checks for login ---
+  // --- Proceed to payment ---
   const handleProceedToPayment = (grandTotal) => {
-    // --- CHECK 1: Check for authentication ---
     if (!isAuthenticated) {
       toast.error("You must be logged in to place an order.");
-      navigate('/login'); // Redirect to login page
+      navigate('/login');
       return;
     }
-
-    // --- CHECK 2: Original checks ---
     if (cartItems.length === 0 || !deliveryLocation) {
       toast.error("Please add items and enter table/room number first.");
       return;
     }
-    
-    setPendingOrderTotal(grandTotal); 
-    setIsPaymentModalOpen(true);     
-    setIsCartOpen(false);            
+    setPendingOrderTotal(grandTotal);
+    setIsPaymentModalOpen(true);
+    setIsCartOpen(false);
   };
 
-  // --- 4. UPDATE: This function now sends user ID and Token ---
+  // --- Confirm payment: Create order + PayMongo checkout ---
   const handleConfirmPayment = async (totalAmount, paymentInfo) => {
-    setIsPaymentModalOpen(false); 
-    setIsPlacingOrder(true);      
+    setIsPaymentModalOpen(false);
+    setIsPlacingOrder(true);
     toast.loading('Placing your order...');
 
     const orderData = {
-      // --- FIX: Use the logged-in user's ID ---
-      customer_id: user.id, 
-      total_price: totalAmount, 
+      customer_id: user.id,
+      total_price: totalAmount,
       order_type: orderType,
       instructions: instructions,
       delivery_location: deliveryLocation,
@@ -131,73 +123,62 @@ function MenuPage() {
     };
 
     try {
-      // Step 1: Create Order
+      // Step 1️⃣ Create the order
       const orderResponse = await fetch('http://localhost:3000/api/orders', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          // --- FIX: Add the Authorization header ---
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(orderData),
+        body: JSON.stringify(orderData)
       });
       const orderResult = await orderResponse.json();
       if (!orderResponse.ok) throw new Error(orderResult.message || 'Failed to create order.');
 
       const newOrderId = orderResult.order_id;
-      const orderTotal = orderResult.total_amount; 
-      const orderDate = orderResult.order_date || new Date().toISOString(); 
-      toast.dismiss();
-      toast.loading('Simulating payment confirmation...');
+      const orderTotal = orderResult.total_amount;
 
-      // Step 2: Simulate Payment
-      const paymentResponse = await fetch(`http://localhost:3000/api/payments/${newOrderId}/simulate`, {
-        method: 'PUT',
-        headers: { 
+      toast.dismiss();
+      toast.loading('Redirecting to PayMongo checkout...');
+
+      // Step 2️⃣ Create PayMongo Checkout Session
+      const paymentResponse = await fetch(`http://localhost:3000/api/payments/${newOrderId}/paymongo`, {
+        method: 'POST',
+        headers: {
           'Content-Type': 'application/json',
-          // --- FIX: Add the Authorization header ---
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ total_amount: orderTotal }),
+        body: JSON.stringify({
+          total_amount: orderTotal,
+          payment_method: paymentInfo.selectedPaymentMethod
+        })
       });
+
       const paymentResult = await paymentResponse.json();
-      if (!paymentResponse.ok) throw new Error(paymentResult.message || 'Failed to simulate payment.');
+      if (!paymentResponse.ok) throw new Error(paymentResult.message || 'Failed to create checkout.');
 
-      setReceiptDetails({
-        order_id: newOrderId,
-        order_date: orderDate,
-        order_type: orderType,
-        delivery_location: deliveryLocation,
-        items: [...cartItems], 
-        total_amount: orderTotal,
-        payment_method: paymentInfo.selectedPaymentMethod 
-      });
-      setIsReceiptModalOpen(true); 
-
-      setCartItems([]);
-      setInstructions('');
-      setDeliveryLocation('');
-      
-      toast.dismiss();
-
+      // Step 3️⃣ Redirect to PayMongo Checkout Page
+      if (paymentResult.checkoutUrl) {
+        window.location.href = paymentResult.checkoutUrl;
+      } else {
+        throw new Error("Missing checkout URL from PayMongo response.");
+      }
     } catch (err) {
       console.error('Order/Payment Error:', err);
       toast.dismiss();
       toast.error(`Error: ${err.message}`);
-    } finally {
-      setIsPlacingOrder(false); 
+      setIsPlacingOrder(false);
     }
   };
 
   const handleCloseReceipt = () => {
     setIsReceiptModalOpen(false);
-    setReceiptDetails(null); 
+    setReceiptDetails(null);
   };
 
-   const filteredItems = items
+  const filteredItems = items
     .filter(item => selectedCategory === 'All' || item.category === selectedCategory)
     .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
-
 
   return (
     <div className="bg-gray-100 min-h-screen" style={primaryColor}>
@@ -207,20 +188,19 @@ function MenuPage() {
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
       />
+
       <main className="container mx-auto px-4 py-8">
-        <div>
-          <PromoBanner />
-          <CategoryTabs
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelectCategory={handleSelectCategory}
-          />
-          <FoodGrid
-            items={filteredItems}
-            onAddToCart={handleAddToCart}
-            onImageClick={(imageUrl) => setSelectedImage(imageUrl)}
-          />
-        </div>
+        <PromoBanner />
+        <CategoryTabs
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelectCategory={handleSelectCategory}
+        />
+        <FoodGrid
+          items={filteredItems}
+          onAddToCart={handleAddToCart}
+          onImageClick={(imageUrl) => setSelectedImage(imageUrl)}
+        />
       </main>
 
       <CartPanel
@@ -236,23 +216,23 @@ function MenuPage() {
         onRemoveItem={handleRemoveItem}
         deliveryLocation={deliveryLocation}
         setDeliveryLocation={setDeliveryLocation}
-        isPlacingOrder={isPlacingOrder} 
+        isPlacingOrder={isPlacingOrder}
       />
 
       <PaymentModal
         isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)} 
+        onClose={() => setIsPaymentModalOpen(false)}
         totalAmount={pendingOrderTotal}
-        onConfirmPayment={handleConfirmPayment} 
+        onConfirmPayment={handleConfirmPayment}
         deliveryLocation={deliveryLocation}
         orderType={orderType}
-        cartItems={cartItems} 
+        cartItems={cartItems}
       />
 
       <ReceiptModal
         isOpen={isReceiptModalOpen}
-        onClose={handleCloseReceipt} 
-        orderDetails={receiptDetails} 
+        onClose={handleCloseReceipt}
+        orderDetails={receiptDetails}
       />
 
       <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
