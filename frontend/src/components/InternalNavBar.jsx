@@ -33,7 +33,7 @@ const InternalNavBar = () => {
         </h1>
       </div>
 
-      {/* Center: Navigation Links */}
+      {/* Center: Navigation Links - ONLY Admin Dashboard remains */}
       <div className="flex items-center gap-20"> 
         {/* Admin-only link */}
         {user.role === 'admin' && (
@@ -47,44 +47,17 @@ const InternalNavBar = () => {
           >
             {({ isActive }) => (
               <span className={`pb-1 ${isActive ? 'border-b border-yellow-400' : ''}`}>
-                Dashboard
+                **Dashboard**
               </span>
             )}
           </NavLink>
         )}
         
-        {/* Staff/Admin links */}
-        <NavLink
-          to="/kitchen"
-          className={({ isActive }) =>
-            `text-base font-medium transition duration-200 
-            hover:${hoverAccentClass} 
-            ${isActive ? hoverAccentClass : textColor}`
-          }
-        >
-          {({ isActive }) => (
-            <span className={`pb-1 ${isActive ? 'border-b border-yellow-400' : ''}`}>
-              Kitchen
-            </span>
-          )}
-        </NavLink>
-        <NavLink
-          to="/kitchen/archive"
-          className={({ isActive }) =>
-            `text-base font-medium transition duration-200 
-            hover:${hoverAccentClass} 
-            ${isActive ? hoverAccentClass : textColor}`
-          }
-        >
-          {({ isActive }) => (
-            <span className={`pb-1 ${isActive ? 'border-b border-yellow-400' : ''}`}>
-              Archive
-            </span>
-          )}
-        </NavLink>
+        {/* Kitchen and Archive links have been REMOVED */}
+        
       </div>
 
-      {/* Right: Profile Dropdown - Passing the new specific color */}
+      {/* Right: Profile Dropdown */}
       <div className="justify-self-end">
         {/* Passing the hex code directly as a prop */}
         <ProfileDropdown iconColor={profileIconHexColor} />
