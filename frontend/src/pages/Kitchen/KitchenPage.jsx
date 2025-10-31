@@ -11,6 +11,14 @@ function KitchenPage() {
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterType, setFilterType] = useState('All Types');
 
+  // --- DESIGN PALETTE ---
+  const BG_COLOR = '#352721'; // Dark Coffee/Brown
+  const PANEL_COLOR = '#FFF2E0'; // Cream/Off-White
+  const TEXT_COLOR = 'text-gray-100'; // Light text for dark background
+  const ACCENT_COLOR = 'text-yellow-400'; // Gold accent from NavBar
+  const CARD_BG_COLOR = 'bg-white'; // Slightly whiter card background for items
+
+  // --- FUNCTIONAL LOGIC (UNTOUCHED) ---
   const fetchOrderDetails = async (orderId) => {
     try {
       const response = await fetch(`http://localhost:3000/api/orders/${orderId}`);
@@ -64,7 +72,6 @@ function KitchenPage() {
       }
     };
 
-  // --- THIS IS THE RESTORED FUNCTION ---
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
       const response = await fetch(`http://localhost:3000/api/orders/${orderId}/status`, {
@@ -98,7 +105,7 @@ function KitchenPage() {
       toast.error(err.message);
     }
   };
-  // --- END OF RESTORED FUNCTION ---
+  // --- END OF FUNCTIONAL LOGIC ---
 
   useEffect(() => {
     fetchAndPopulateOrders(true);
@@ -109,54 +116,73 @@ function KitchenPage() {
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-center text-lg">Loading active orders...</div>;
+    return (
+        <div style={{ backgroundColor: BG_COLOR }} className={`min-h-screen ${TEXT_COLOR} p-8 text-center text-lg`}>
+            <InternalNavBar />
+            <p>Loading active orders...</p>
+        </div>
+    );
   }
 
   if (error && kitchenOrders.length === 0) {
-    return <div className="p-8 text-center text-red-500">Error: {error}</div>;
+    return (
+        <div style={{ backgroundColor: BG_COLOR }} className={`min-h-screen ${TEXT_COLOR} p-8 text-center text-red-400`}>
+            <InternalNavBar />
+            <p>Error: {error}</p>
+        </div>
+    );
   }
 
   const filteredOrders = Array.isArray(kitchenOrders) ? kitchenOrders.filter(order => {
     const statusMatch = filterStatus === 'All' || (order.status && order.status.toLowerCase() === filterStatus.toLowerCase());
     const typeMatch = filterType === 'All Types' || (order.order_type && order.order_type.toLowerCase() === filterType.toLowerCase());
     return statusMatch && typeMatch;
-  }) : []; // Ensure filteredOrders is always an array
+  }) : []; 
+  
+  // --- START OF DESIGN CHANGES ---
   return (
     <>
     <InternalNavBar />
-    <div className="bg-figma-cream min-h-screen px-4 py-8 text-figma-dark-green">
+    {/* Main Page Container: Apply BG_COLOR */}
+    <div style={{ backgroundColor: BG_COLOR }} className={`min-h-screen px-6 py-8 ${TEXT_COLOR}`}>
       <div className="container mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">Kitchen Order Display</h1>
+        <h1 className={`text-4xl font-extrabold mb-8 text-center ${ACCENT_COLOR} tracking-wide`}>
+            KITCHEN ORDER DISPLAY
+        </h1>
         
-        {error && <p className="text-center text-red-500 text-sm mb-4">Error fetching updates: {error}</p>}
+        {error && <p className="text-center text-red-400 text-sm mb-6">Error fetching updates: {error}</p>}
 
-        {/* --- NEW: Dropdown Filters Container --- */}
-        <div className="bg-figma-off-white p-4 rounded-lg shadow-md mb-6 flex flex-col md:flex-row justify-around items-center gap-4">
+        {/* Filters Container: Apply PANEL_COLOR */}
+        <div 
+            style={{ backgroundColor: PANEL_COLOR }} 
+            className={`p-5 rounded-xl shadow-2xl mb-8 flex flex-col md:flex-row justify-around items-center gap-6 ${TEXT_COLOR} text-gray-800`}
+        >
           {/* Filter by Status Dropdown */}
-          <div className="flex flex-col w-full md:w-1/2 lg:w-1/3">
-            <label htmlFor="status-filter" className="text-sm font-semibold mb-1">Filter by Status</label>
+          <div className="flex flex-col w-full md:w-1/2 lg:w-1/4">
+            <label htmlFor="status-filter" className="text-sm font-bold mb-2">FILTER BY STATUS</label>
             <select
               id="status-filter"
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="p-2 border border-gray-300 rounded-md bg-white text-gray-800 shadow-sm focus:ring-figma-dark-green focus:border-figma-dark-green"
+              // Minimalist Select Styling
+              className="p-3 border-2 border-gray-300 rounded-lg bg-white text-gray-800 shadow-inner focus:ring-amber-500 focus:border-amber-500"
             >
               <option value="All">All</option>
-              <option value="Pending">Pending</option>
+              <option value="Pending">Pending (New)</option>
               <option value="Preparing">Preparing</option>
-              <option value="Ready">Ready</option>
-              {/* Served orders are removed from kitchenOrders, so they won't appear here */}
+              <option value="Ready">Ready for Pick-up</option>
             </select>
           </div>
 
           {/* Filter by Type Dropdown */}
-          <div className="flex flex-col w-full md:w-1/2 lg:w-1/3">
-            <label htmlFor="type-filter" className="text-sm font-semibold mb-1">Filter by Type</label>
+          <div className="flex flex-col w-full md:w-1/2 lg:w-1/4">
+            <label htmlFor="type-filter" className="text-sm font-bold mb-2">FILTER BY TYPE</label>
             <select
               id="type-filter"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="p-2 border border-gray-300 rounded-md bg-white text-gray-800 shadow-sm focus:ring-figma-dark-green focus:border-figma-dark-green"
+              // Minimalist Select Styling
+              className="p-3 border-2 border-gray-300 rounded-lg bg-white text-gray-800 shadow-inner focus:ring-amber-500 focus:border-amber-500"
             >
               <option value="All Types">All Types</option>
               <option value="Dine-in">Dine-in</option>
@@ -166,90 +192,121 @@ function KitchenPage() {
         </div>
 
         {filteredOrders.length === 0 ? (
-          <p className="text-center text-gray-500 mt-10">
+          <p className={`text-center text-lg mt-12 ${TEXT_COLOR} opacity-70`}>
             No {filterStatus !== 'All' ? filterStatus.toLowerCase() + ' ' : ''}
             {filterType !== 'All Types' ? filterType.toLowerCase() + ' ' : ''}
-            orders.
+            orders currently in the queue. 
           </p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          /* Order Grid: Changed to 2 columns (md:grid-cols-2) and used a larger gap */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-7xl mx-auto">
             {filteredOrders.map(order => (
-              <div key={order.order_id} className="p-4 rounded-lg shadow-md bg-white flex flex-col h-full">
-                <div className="mb-3 border-b pb-2">
-                  <h2 className="font-bold text-lg">Order #{order.order_id}</h2>
-                  <p className="text-xs text-gray-500">Time: {new Date(order.order_date).toLocaleTimeString()}</p>
-                  <p className="text-sm">Type: <span className="font-medium">{order.order_type}</span></p>
-                  <p className="text-sm">Location: <span className="font-medium">{order.delivery_location}</span></p>
-                  <p className="text-sm">Customer: <span className="font-medium">{order.first_name} {order.last_name}</span></p>
+              /* Order Card: Apply PANEL_COLOR with shadow */
+              <div 
+                key={order.order_id} 
+                style={{ backgroundColor: PANEL_COLOR }} 
+                // Removed h-full to allow card to be taller based on content/font size
+                className={`p-8 rounded-xl shadow-2xl flex flex-col transition-shadow duration-300 hover:shadow-2xl text-gray-800 border-t-4 border-b-4 
+                  ${order.status.toLowerCase() === 'pending' ? 'border-yellow-500' :
+                    order.status.toLowerCase() === 'preparing' ? 'border-blue-500' :
+                    order.status.toLowerCase() === 'ready' ? 'border-green-500' :
+                    'border-gray-500'
+                  }
+                `}
+              >
+                {/* Header Section */}
+                <div className="mb-5 pb-4 border-b border-gray-400">
+                  <h2 className="font-extrabold text-4xl mb-1 flex items-center justify-between">
+                    <span className="text-gray-900">Order #{order.order_id}</span>
+                    <span 
+                      className={`text-base font-bold tracking-wider px-4 py-1 rounded-full 
+                        ${order.order_type.toLowerCase() === 'dine-in' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700'}
+                      `}
+                    >
+                      {order.order_type.toUpperCase()}
+                    </span>
+                  </h2>
+                  <p className="text-sm text-gray-600 font-medium mt-1">
+                    {new Date(order.order_date).toLocaleTimeString()}
+                    {' '}| Location: {order.delivery_location}
+                  </p>
                 </div>
 
-                <div className="space-y-2 mb-3 flex-grow overflow-y-auto max-h-48 pr-1">
-                  <h3 className="font-semibold">Items:</h3>
+                {/* Items Section (Increased font size and spacing) */}
+                <div className="space-y-4 mb-5 flex-grow overflow-y-auto max-h-72 pr-2">
+                  <h3 className="font-extrabold text-lg uppercase text-gray-700 border-b pb-2">Items:</h3>
                   {order.details && order.details.length > 0 ? (
                     order.details.map(item => (
-                      <div key={item.detail_id} className="text-sm ml-2">
-                        <span className="font-medium">{item.quantity} x</span> {item.item_name}
-                        {item.instructions && <p className="text-xs text-gray-600 italic pl-4">- {item.instructions}</p>}
+                      <div key={item.detail_id} className={`text-lg flex justify-between items-start p-3 rounded ${CARD_BG_COLOR} shadow-md border-l-4 border-gray-400`}>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-gray-800">{item.item_name}</span>
+                            {item.instructions && <p className="text-sm text-red-700 italic mt-1 pl-1"> NOTE: {item.instructions}</p>}
+                        </div>
+                        <span className="font-extrabold text-xl text-red-600 ml-4">x{item.quantity}</span>
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-gray-500 ml-2">No item details found.</p>
+                    <p className="text-base text-gray-500 ml-2">No item details found.</p>
                   )}
                 </div>
 
-                 <div className="text-center mb-3">
-                   <span className={`py-1 px-3 rounded-full text-xs font-semibold ${
-                        order.status.toLowerCase() === 'pending' ? 'bg-yellow-200 text-yellow-800' :
-                        order.status.toLowerCase() === 'preparing' ? 'bg-blue-200 text-blue-800' :
-                        order.status.toLowerCase() === 'ready' ? 'bg-green-200 text-green-800' :
-                        'bg-gray-200 text-gray-800'
-                      }`}
-                    >
-                      Status: {order.status}
-                    </span>
-                 </div>
+                {/* Status Indicator (Larger and more visible) */}
+                <div className="text-center mb-5 border-t pt-4 border-gray-400">
+                  <span className={`py-3 px-5 rounded-xl text-lg font-extrabold tracking-wider uppercase shadow-lg ${
+                      order.status.toLowerCase() === 'pending' ? 'bg-yellow-500 text-gray-900' :
+                      order.status.toLowerCase() === 'preparing' ? 'bg-blue-500 text-white' :
+                      order.status.toLowerCase() === 'ready' ? 'bg-green-500 text-white' :
+                      'bg-gray-400 text-gray-800'
+                    }`}
+                  >
+                    {order.status}
+                  </span>
+                </div>
 
-                <div className="mt-auto pt-4 border-t flex flex-col gap-2">
+                {/* Action Buttons (Removed Icons) */}
+                <div className="mt-auto pt-4 border-t border-gray-400 flex flex-col gap-3">
                   {order.status.toLowerCase() === 'pending' && (
                     <button
                       onClick={() => handleUpdateStatus(order.order_id, 'Preparing')}
-                      className="bg-green-900 text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-opacity-90 transition-colors w-full"
+                      className="bg-green-700 text-white py-3 rounded-xl text-lg font-bold hover:bg-green-800 transition-colors w-full shadow-lg"
                     >
-                      Accept (Prepare)
+                      ACCEPT AND PREPARE
                     </button>
                   )}
                   {order.status.toLowerCase() === 'preparing' && (
                     <button
                       onClick={() => handleUpdateStatus(order.order_id, 'Ready')}
-                      className="bg-blue-500 text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-blue-600 transition-colors w-full"
+                      className="bg-orange-500 text-white py-3 rounded-xl text-lg font-bold hover:bg-orange-600 transition-colors w-full shadow-lg"
                     >
-                      Mark as Ready
+                      MARK AS READY
                     </button>
                   )}
                   {order.status.toLowerCase() === 'ready' && (
                     <button
                       onClick={() => handleUpdateStatus(order.order_id, 'Served')}
-                      className="bg-orange-500 text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-opacity-90 transition-colors w-full"
+                      className="bg-red-700 text-white py-3 rounded-xl text-lg font-bold hover:bg-red-800 transition-colors w-full shadow-lg"
                     >
-                      Mark as Served
+                      MARK AS SERVED
                     </button>
                   )}
+                  {/* Cancel Button */}
                   {(order.status.toLowerCase() === 'pending' || order.status.toLowerCase() === 'preparing' || order.status.toLowerCase() === 'ready') && (
-                     <button
-                      onClick={() => handleUpdateStatus(order.order_id, 'Cancelled')}
-                      className="bg-red-500 text-white py-2 px-4 rounded-md text-sm font-semibold hover:bg-red-600 transition-colors w-full"
-                    >
-                      Cancel
-                    </button>
-                   )}
+                      <button
+                       onClick={() => handleUpdateStatus(order.order_id, 'Cancelled')}
+                       className="bg-gray-400 text-gray-800 py-2 rounded-xl text-base font-semibold hover:bg-gray-500 transition-colors w-full mt-2"
+                     >
+                       CANCEL ORDER
+                     </button>
+                    )}
                 </div>
               </div>
             ))}
           </div>
         )}
-         <div className="mt-8 text-center">
-           <Link to="/" className="text-blue-500 hover:underline">&larr; Back to Customer Menu</Link>
-         </div>
+        {/* Back Link */}
+        <div className="mt-12 text-center">
+          <Link to="/" className={`text-lg ${ACCENT_COLOR} hover:text-white transition underline`}>&larr; Back to Customer Menu</Link>
+        </div>
       </div>
     </div>
     </>

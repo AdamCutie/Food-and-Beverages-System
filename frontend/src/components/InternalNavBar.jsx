@@ -6,29 +6,50 @@ import { useAuth } from '../context/AuthContext';
 const InternalNavBar = () => {
   const { user } = useAuth();
 
+  // Define the colors
+  const bgColor = '#352721'; 
+  const textColor = 'text-gray-200';
+  const hoverAccentClass = 'text-yellow-400'; // Still using Tailwind class for link hover/active
+  const profileIconHexColor = '#FFA237'; // The specific gold color requested
+
   return (
-    <nav className="bg-primary text-white flex items-center justify-between px-6 py-2 shadow-md sticky top-0 z-10">
+    <nav 
+      style={{ backgroundColor: bgColor }} 
+      className={`
+        ${textColor} 
+        flex items-center justify-between 
+        px-8 py-3 shadow-2xl 
+        sticky top-0 z-10 
+        border-b border-gray-700
+      `}
+    >
       {/* Left: Logo and Title */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-5"> 
         <Link to={user.role === 'admin' ? '/admin' : '/kitchen'}>
-          <img src="/images/logo_var.svg" alt="Logo" className="h-16" />
+          <img src="/images/logo_var.svg" alt="Logo" className="h-20 w-auto" /> 
         </Link>
-        <h1 className="text-xl font-bold">
+        <h1 className="text-xl font-semibold tracking-wider opacity-90"> 
           {user.role === 'admin' ? 'Admin Dashboard' : 'Kitchen Display'}
         </h1>
       </div>
 
       {/* Center: Navigation Links */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-20"> 
         {/* Admin-only link */}
         {user.role === 'admin' && (
           <NavLink
             to="/admin"
             className={({ isActive }) =>
-              `text-lg font-medium hover:text-accent ${isActive ? 'text-accent' : 'text-white'}`
+              `text-base font-medium transition duration-200 
+              hover:${hoverAccentClass} 
+              ${isActive ? hoverAccentClass : textColor}`
             }
           >
-            Dashboard
+            {({ isActive }) => (
+              <span className={`pb-1 ${isActive ? 'border-b border-yellow-400' : ''}`}>
+                Dashboard
+              </span>
+            )}
           </NavLink>
         )}
         
@@ -36,24 +57,37 @@ const InternalNavBar = () => {
         <NavLink
           to="/kitchen"
           className={({ isActive }) =>
-            `text-lg font-medium hover:text-accent ${isActive ? 'text-accent' : 'text-white'}`
+            `text-base font-medium transition duration-200 
+            hover:${hoverAccentClass} 
+            ${isActive ? hoverAccentClass : textColor}`
           }
         >
-          Kitchen
+          {({ isActive }) => (
+            <span className={`pb-1 ${isActive ? 'border-b border-yellow-400' : ''}`}>
+              Kitchen
+            </span>
+          )}
         </NavLink>
         <NavLink
           to="/kitchen/archive"
           className={({ isActive }) =>
-            `text-lg font-medium hover:text-accent ${isActive ? 'text-accent' : 'text-white'}`
+            `text-base font-medium transition duration-200 
+            hover:${hoverAccentClass} 
+            ${isActive ? hoverAccentClass : textColor}`
           }
         >
-          Archive
+          {({ isActive }) => (
+            <span className={`pb-1 ${isActive ? 'border-b border-yellow-400' : ''}`}>
+              Archive
+            </span>
+          )}
         </NavLink>
       </div>
 
-      {/* Right: Profile Dropdown */}
+      {/* Right: Profile Dropdown - Passing the new specific color */}
       <div className="justify-self-end">
-        <ProfileDropdown />
+        {/* Passing the hex code directly as a prop */}
+        <ProfileDropdown iconColor={profileIconHexColor} />
       </div>
     </nav>
   );
