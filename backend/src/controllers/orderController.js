@@ -1,14 +1,12 @@
 import pool from "../config/mysql.js";
-// --- (itemController imports are unchanged) ---
 import { validateStock, adjustStock, logOrderStockChange } from "./itemController.js";
 
-// --- DEFINE CONSTANTS HERE ---
-// By defining rates on the backend, they are secure and easy to update.
+// --- (Constants are unchanged) ---
 const SERVICE_RATE = 0.10; // 10%
 const VAT_RATE = 0.12;     // 12%
 
 
-// @desc    Create a new order (Deducts stock immediately)
+// @desc    Create a new order
 // @route   POST /api/orders
 // @access  Private (Customer)
 export const createOrder = async (req, res) => {
@@ -16,42 +14,39 @@ export const createOrder = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // --- 1. 'total_price' is REMOVED from req.body ---
-        // We will calculate it on the backend.
         const { customer_id, items, order_type, instructions, delivery_location } = req.body;
 
         if (!customer_id || !items || items.length === 0 || !delivery_location) {
             throw new Error("Missing required order information.");
         }
         
-        // --- 2. Create the initial order record ---
-        // We will update the financial fields in a moment.
+        // Create the initial order record
         const orderSql = "INSERT INTO orders (customer_id, order_type, delivery_location, status) VALUES (?, ?, ?, 'Pending')";
         const [orderResult] = await connection.query(orderSql, [customer_id, order_type, delivery_location]);
         const order_id = orderResult.insertId;
 
-        // --- 3. Validate stock AND calculate totals ---
-        let calculatedItemsTotal = 0; // This is our new 'items_total'
+        // --- Calculate totals ---
+        let calculatedItemsTotal = 0; 
         
-        await validateStock(items, connection); // Validates stock first
+        // --- 1. VALIDATE STOCK IS REMOVED ---
+        // We no longer validate stock on creation.
 
         for (const item of items) {
             const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
             
-            calculatedItemsTotal += subtotal; // Add to the grand subtotal
+            calculatedItemsTotal += subtotal;
             
             const detailSql = "INSERT INTO order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
         }
 
-        // --- 4. Perform backend-side financial calculations ---
+        // --- Perform backend-side financial calculations ---
         const calculatedServiceCharge = calculatedItemsTotal * SERVICE_RATE;
-        // VAT is calculated on subtotal + service charge
         const calculatedVatAmount = (calculatedItemsTotal + calculatedServiceCharge) * VAT_RATE; 
         const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
 
-        // --- 5. Update the order with the calculated financial data ---
+        // --- Update the order with the calculated financial data ---
         const updateSql = `
             UPDATE orders 
             SET 
@@ -69,18 +64,16 @@ export const createOrder = async (req, res) => {
             order_id
         ]);
 
-        // --- 6. Deduct stock and log the change ---
-        await adjustStock(items, 'deduct', connection);
-        await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
-        console.log(`Ingredient stock deducted and logged for order ${order_id}`);
+        // --- 2. DEDUCT STOCK AND LOGS ARE REMOVED ---
+        // await adjustStock(items, 'deduct', connection);
+        // await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
+        // console.log(`Ingredient stock deducted and logged for order ${order_id}`);
 
         await connection.commit();
 
-        // --- 7. Return the 'order_id' and the final 'total_amount' ---
-        // The frontend needs this total_amount for the PayMongo request.
         res.status(201).json({
             order_id,
-            total_amount: calculatedTotalAmount, // Send the secure, calculated total
+            total_amount: calculatedTotalAmount,
             message: "Order created successfully"
         });
 
@@ -93,7 +86,7 @@ export const createOrder = async (req, res) => {
     }
 };
 
-// ... (getOrders remains the same) ...
+// ... (getOrders and getOrderById remain the same) ...
 // @desc    Get all orders
 // @route   GET /api/orders
 // @access  Private
@@ -114,7 +107,6 @@ export const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // --- 1. Fetch order record (including new financial columns) ---
     const [orders] = await pool.query(
         "SELECT *, items_total, service_charge_amount, vat_amount FROM orders WHERE order_id = ?", 
         [id]
@@ -137,19 +129,15 @@ export const getOrderById = async (req, res) => {
     const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [id]);
     const payment = payments[0] || {};
 
-    // --- 2. Build clean response with all financial details ---
     res.json({
       order_id: order.order_id,
       order_date: order.order_date,
       order_type: order.order_type,
       delivery_location: order.delivery_location,
-      
-      // The financial breakdown for the receipt
       items_total: order.items_total,
       service_charge_amount: order.service_charge_amount,
       vat_amount: order.vat_amount,
-      total_price: order.total_amount, // 'total_price' is the key the frontend expects
-      
+      total_price: order.total_amount,
       status: order.status,
       items,
       payment_method: payment.payment_method || "PayMongo",
@@ -162,7 +150,6 @@ export const getOrderById = async (req, res) => {
 };
 
 
-// ... (updateOrderStatus remains the same) ...
 // @desc    Update order operational status (e.g., Preparing, Served)
 // @route   PUT /api/orders/:id/status
 // @access  Private (Staff/Admin)
@@ -174,25 +161,51 @@ export const updateOrderStatus = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        if (status.toLowerCase() === 'cancelled') {
-             const [payments] = await connection.query("SELECT * FROM payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
+        // --- 1. GET CURRENT STATUS FIRST ---
+        // Lock the row to prevent race conditions
+        const [orders] = await connection.query("SELECT status FROM orders WHERE order_id = ? FOR UPDATE", [id]);
+        if (orders.length === 0) {
+            throw new Error("Order not found");
+        }
+        const currentStatus = orders[0].status;
 
-            if (payments.length > 0) {
-                 console.warn(`Order ${id} was already paid. Cancellation requested, but stock NOT restored automatically.`);
-            } else {
-                 console.log(`Restoring ingredient stock for cancelled unpaid order: ${id}`);
-                 const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
-                 
-                 // Restore stock
-                 await adjustStock(details, 'restore', connection);
-                 
-                 // --- ⭐️ NEW LOGGING STEP ⭐️ ---
-                 await logOrderStockChange(id, details, 'ORDER_RESTORE', connection);
+        // --- 2. NEW LOGIC: DEDUCT STOCK WHEN MOVING TO "PREPARING" ---
+        if (status.toLowerCase() === 'preparing' && currentStatus === 'pending') {
+            // This is the "Accept" action. We commit ingredients here.
+            const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
+            
+            // Validate stock BEFORE proceeding
+            await validateStock(details, connection); // Throws error if not enough stock
+            
+            // Deduct stock and log it
+            await adjustStock(details, 'deduct', connection);
+            await logOrderStockChange(id, details, 'ORDER_DEDUCT', connection);
+            console.log(`Ingredient stock deducted and logged for order ${id}`);
+        }
+        // --- 3. MODIFIED LOGIC: RESTORE STOCK ONLY IF IT WAS DEDUCTED ---
+        else if (status.toLowerCase() === 'cancelled') {
+            // Only restore stock if the order was in a state where stock was already taken
+            if (currentStatus === 'preparing' || currentStatus === 'ready') {
+                const [payments] = await connection.query("SELECT * FROM payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
+
+                if (payments.length > 0) {
+                    console.warn(`Order ${id} was already paid. Cancellation requested, but stock NOT restored automatically.`);
+                } else {
+                    console.log(`Restoring ingredient stock for cancelled unpaid order: ${id}`);
+                    const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
+                    
+                    // Restore stock
+                    await adjustStock(details, 'restore', connection);
+                    await logOrderStockChange(id, details, 'ORDER_RESTORE', connection);
+                }
             }
+            // If currentStatus is 'pending', no stock was taken, so we do nothing.
         }
 
+        // --- 4. UPDATE STATUS (This runs for all status changes) ---
         const [result] = await connection.query("UPDATE orders SET status = ? WHERE order_id = ?", [status, id]);
         if (result.affectedRows === 0) {
+            // This case should be caught by the check above, but good to keep
             throw new Error("Order not found");
         }
 
@@ -201,6 +214,13 @@ export const updateOrderStatus = async (req, res) => {
 
     } catch (error) {
         await connection.rollback();
+        // --- 5. CATCH VALIDATION ERRORS ---
+        // Send a 400 (Bad Request) if stock validation fails, so the kitchen UI can display it.
+        if (error.message.startsWith("Not enough stock")) {
+            console.error(`Stock validation failed for order ${id}: ${error.message}`);
+            return res.status(400).json({ message: error.message });
+        }
+        // Otherwise, send a generic 500 error.
         res.status(500).json({ message: "Failed to update order status", error: error.message });
     } finally {
         connection.release();
