@@ -81,13 +81,15 @@ export const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Fetch order record
     const [orders] = await pool.query("SELECT * FROM orders WHERE order_id = ?", [id]);
     if (orders.length === 0) {
       return res.status(404).json({ message: "Order not found" });
     }
     const order = orders[0];
 
-    const [items] = await pool.query(
+    // Fetch ordered items
+        const [items] = await pool.query(
     `SELECT mi.item_name, od.quantity, mi.price 
     FROM order_details od 
     JOIN menu_items mi ON od.item_id = mi.item_id 
@@ -95,14 +97,19 @@ export const getOrderById = async (req, res) => {
     [id]
     );
 
+    // Fetch payment info
     const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [id]);
     const payment = payments[0] || {};
 
+    // Build clean response
     res.json({
       order_id: order.order_id,
       order_date: order.order_date,
       order_type: order.order_type,
       delivery_location: order.delivery_location,
+      // --- ⭐️ THIS IS THE FIX ⭐️ ---
+      // We must send `order.total_amount` from the database.
+      // The frontend expects it as the key 'total_price'.
       total_price: order.total_amount, 
       status: order.status,
       items,

@@ -109,8 +109,8 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
               <span>₱{vatAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-lg text-black pt-2 border-t mt-2">
-              <span>Total Amount Paid:</span>
-              <span>₱{total_amount.toFixed(2)}</span>
+            <span>Total Amount Paid:</span>
+            <span>₱{parseFloat(total_amount).toFixed(2)}</span>
             </div>
              <div className="flex justify-between text-green-600 font-semibold pt-2">
               <span>Loyalty Points Earned:</span>
