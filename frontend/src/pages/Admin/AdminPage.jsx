@@ -7,9 +7,11 @@ import AdminHeader from './components/AdminHeader';
 import StaffManagementTable from './components/StaffManagementTable';
 import StaffModal from './components/StaffModal';
 import InventoryLogsTable from './components/InventoryLogsTable';
+import AnalyticsDashboard from './components/AnalyticsDashboard'; 
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../utils/apiClient';
 
+// ... (OrderManagementTable component is unchanged) ...
 const OrderManagementTable = ({ orders }) => (
   <div className="bg-white shadow-md rounded-lg overflow-hidden">
     <h2 className="text-2xl font-bold p-6">Order Management</h2>
@@ -17,7 +19,6 @@ const OrderManagementTable = ({ orders }) => (
       <thead>
         <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
           <th className="py-3 px-6 text-left">Order ID</th>
-          {/* --- 1. HEADER FIX --- */}
           <th className="py-3 px-6 text-left">Customer Name</th>
           <th className="py-3 px-6 text-left">Type</th>
           <th className="py-3 px-6 text-left">Location</th>
@@ -30,13 +31,9 @@ const OrderManagementTable = ({ orders }) => (
         {orders.map((order) => (
           <tr key={order.order_id} className="border-b border-gray-200 hover:bg-gray-50">
             <td className="py-3 px-6 text-left whitespace-nowrap">{order.order_id}</td>
-            
-            {/* --- 2. DATA CELL FIX --- */}
-            {/* Display name, or "Guest" if customer_id was NULL */}
             <td className="py-3 px-6 text-left">
               {order.first_name || order.last_name ? `${order.first_name} ${order.last_name}` : 'Guest'}
             </td>
-
             <td className="py-3 px-6 text-left">{order.order_type}</td>
             <td className="py-3 px-6 text-left">{order.delivery_location}</td>
             <td className="py-3 px-6 text-center">
@@ -62,49 +59,44 @@ const OrderManagementTable = ({ orders }) => (
   </div>
 );
 
+
 function AdminPage() {
-  // ... (Rest of the file is unchanged) ...
+  // ... (All state and handlers are unchanged) ...
   const [orders, setOrders] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [categories, setCategories] = useState([]); 
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('orders'); 
+  const [currentView, setCurrentView] = useState('analytics'); 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
   const [menuFilterCategory, setMenuFilterCategory] = useState('All');
-
   const { token } = useAuth();
   
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
         const [ordersResponse, itemsResponse, staffResponse, categoriesResponse] = await Promise.all([
           apiClient('/orders'),
           apiClient('/items'),
           apiClient('/admin/staff'),
           apiClient('/categories') 
         ]);
-        
         if (!ordersResponse.ok || !itemsResponse.ok || !staffResponse.ok || !categoriesResponse.ok) {
            throw new Error('Failed to fetch data');
         }
-        
         const ordersData = await ordersResponse.json();
         const itemsData = await itemsResponse.json();
         const staffData = await staffResponse.json();
         const categoriesData = await categoriesResponse.json(); 
-
         setOrders(ordersData);
         setMenuItems(itemsData);
         setStaffList(staffData);
         setCategories(categoriesData);
-        
       } catch (err) {
         if (err.message !== 'Session expired') {
           setError(err.message);
@@ -118,6 +110,7 @@ function AdminPage() {
     }
   }, [token]);
 
+  // ... (All handler functions are unchanged) ...
   const handleAddNewItem = async (formData) => {
     const payload = {
       ...formData,
@@ -126,7 +119,6 @@ function AdminPage() {
         quantity_consumed: ing.quantity_consumed
       }))
     };
-    
     try {
       const response = await apiClient('/admin/items', { 
         method: 'POST',
@@ -136,11 +128,9 @@ function AdminPage() {
          const errData = await response.json();
          throw new Error(errData.message || 'Failed to save the item.');
       }
-      
       const itemsResponse = await apiClient('/items');
       const itemsData = await itemsResponse.json();
       setMenuItems(itemsData);
-
       toast.success('Item added successfully!'); 
       closeModal(); 
     } catch (error) {
@@ -158,7 +148,6 @@ function AdminPage() {
         quantity_consumed: ing.quantity_consumed
       }))
     };
-    
     try {
       const response = await apiClient(`/admin/items/${editingItem.item_id}`, { 
         method: 'PUT',
@@ -168,11 +157,9 @@ function AdminPage() {
          const errData = await response.json();
          throw new Error(errData.message || 'Failed to update item.');
       }
-      
       const itemsResponse = await apiClient('/items');
       const itemsData = await itemsResponse.json();
       setMenuItems(itemsData);
-
       toast.success('Item updated successfully!');
       closeModal();
     } catch (error) {
@@ -184,7 +171,6 @@ function AdminPage() {
 
   const handleDeleteItem = async (itemIdToDelete) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
-    
     try {
       const response = await apiClient(`/admin/items/${itemIdToDelete}`, { 
         method: 'DELETE',
@@ -202,7 +188,7 @@ function AdminPage() {
     }
   };
 
-const openModalForEdit = (item) => {
+  const openModalForEdit = (item) => {
     setEditingItem(item);
     setIsModalOpen(true);
   };
@@ -241,7 +227,6 @@ const openModalForEdit = (item) => {
       });
       const updatedList = await listResponse.json();
       setStaffList(updatedList);
-      
       toast.success('Staff member added successfully!');
       closeStaffModal();
     } catch (error) {
@@ -256,7 +241,6 @@ const openModalForEdit = (item) => {
     if (!payload.password) {
       delete payload.password;
     }
-
     try {
       const response = await apiClient(`/admin/staff/${editingStaff.staff_id}`, {
         method: 'PUT',
@@ -266,13 +250,11 @@ const openModalForEdit = (item) => {
         const errData = await response.json();
         throw new Error(errData.message || 'Failed to update staff member.');
       }
-      
       const listResponse = await apiClient('/admin/staff', { 
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const updatedList = await listResponse.json();
       setStaffList(updatedList);
-
       toast.success('Staff member updated successfully!');
       closeStaffModal();
     } catch (error) {
@@ -301,13 +283,13 @@ const openModalForEdit = (item) => {
     }
   };
 
-  const openStaffModalForEdit = (staff) => {
+   const openStaffModalForEdit = (staff) => {
     setEditingStaff(staff);
     setIsStaffModalOpen(true);
   };
   
   const openStaffModalForAdd = () => {
-    setEditingStaff(null);
+    setEditingItem(null);
     setIsStaffModalOpen(true);
   };
 
@@ -316,107 +298,139 @@ const openModalForEdit = (item) => {
     setEditingStaff(null);
   };
 
-
-   if (loading) return <div className="p-8">Loading dashboard...</div>;
-  if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
-  
-  const allCategoriesForFilter = ['All', ...new Set(menuItems.map(item => item.category))];
-
-  const filteredMenuItems = menuItems.filter(item => 
+   const allCategoriesForFilter = ['All', ...new Set(menuItems.map(item => item.category))];
+   const filteredMenuItems = menuItems.filter(item => 
     menuFilterCategory === 'All' || item.category === menuFilterCategory
-  );
+   );
+
+   // --- ACCENT COLOR for tabs ---
+   const accentColor = '#F9A825'; // From your tailwind.config.js
 
    return (
     <>
-      <AdminHeader />
-      <div className="container mx-auto px-4 py-8">
-      
-        <nav className="flex space-x-4 border-b mb-8">
-          <button
-            onClick={() => setCurrentView('orders')}
-            className={`py-2 px-4 text-lg font-semibold transition-colors ${
-              currentView === 'orders'
-                ? 'border-b-2 border-orange-500 text-orange-500'
-                : 'text-gray-500 hover:text-orange-500'
-            }`}
-          >
-            Order Management
-          </button>
-          <button
-            onClick={() => setCurrentView('menu')}
-            className={`py-2 px-4 text-lg font-semibold transition-colors ${
-              currentView === 'menu'
-                ? 'border-b-2 border-orange-500 text-orange-500'
-                : 'text-gray-500 hover:text-orange-500'
-            }`}
-          >
-            Menu Management
-          </button>
-          <button
-            onClick={() => setCurrentView('staff')}
-            className={`py-2 px-4 text-lg font-semibold transition-colors ${
-              currentView === 'staff'
-                ? 'border-b-2 border-orange-500 text-orange-500'
-                : 'text-gray-500 hover:text-orange-500'
-            }`}
-          >
-            Staff Management
-          </button>
-          <button
-            onClick={() => setCurrentView('logs')}
-            className={`py-2 px-4 text-lg font-semibold transition-colors ${
-              currentView === 'logs'
-                ? 'border-b-2 border-orange-500 text-orange-500'
-                : 'text-gray-500 hover:text-orange-500'
-            }`}
-          >
-            Inventory Logs
-          </button>
-
-        </nav>
-
-        <main>
-          {currentView === 'orders' && <OrderManagementTable orders={orders} />}
-          {currentView === 'menu' && (
-            <MenuManagementTable
-              items={filteredMenuItems} 
-              totalItems={filteredMenuItems.length} 
-              categories={allCategoriesForFilter} 
-              selectedCategory={menuFilterCategory}
-              onFilterChange={handleMenuFilterChange}
-              onClearFilters={handleClearFilters}
-              onAddItem={openModalForAdd}
-              onEditItem={openModalForEdit}
-              onDeleteItem={handleDeleteItem}
-            />
-          )}
-          {currentView === 'staff' && (
-            <StaffManagementTable
-              staffList={staffList}
-              onAddStaff={openStaffModalForAdd}
-              onEditStaff={openStaffModalForEdit}
-              onDeleteStaff={handleDeleteStaff}
-            />
-          )}
-          
-          {currentView === 'logs' && <InventoryLogsTable />}
-
-        </main>
+      {/* --- INLINE STYLE FOR BACKGROUND --- */}
+      <div style={{ backgroundColor: '#fff2e0', minHeight: '100vh' }}>
+        <AdminHeader />
+        <div className="container mx-auto px-4 py-8">
         
-        <AddItemModal
-          isOpen={isModalOpen}
-          onClose={closeModal}
-          onSave={editingItem ? handleUpdateItem : handleAddNewItem}
-          itemToEdit={editingItem}
-          categories={categories} 
-        />
+          <nav className="flex space-x-4 border-b mb-8">
+            <button
+              onClick={() => setCurrentView('analytics')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: currentView === 'analytics' ? accentColor : '#6B7280',
+                borderBottom: currentView === 'analytics' ? `2px solid ${accentColor}` : '2px solid transparent'
+              }}
+            >
+              Analytics
+            </button>
+            <button
+              onClick={() => setCurrentView('orders')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: currentView === 'orders' ? accentColor : '#6B7280',
+                borderBottom: currentView === 'orders' ? `2px solid ${accentColor}` : '2px solid transparent'
+              }}
+            >
+              Order Management
+            </button>
+            <button
+              onClick={() => setCurrentView('menu')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: currentView === 'menu' ? accentColor : '#6B7280',
+                borderBottom: currentView === 'menu' ? `2px solid ${accentColor}` : '2px solid transparent'
+              }}
+            >
+              Menu Management
+            </button>
+            <button
+              onClick={() => setCurrentView('staff')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: currentView === 'staff' ? accentColor : '#6B7280',
+                borderBottom: currentView === 'staff' ? `2px solid ${accentColor}` : '2px solid transparent'
+              }}
+            >
+              Staff Management
+            </button>
+            <button
+              onClick={() => setCurrentView('logs')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: currentView === 'logs' ? accentColor : '#6B7280',
+                borderBottom: currentView === 'logs' ? `2px solid ${accentColor}` : '2px solid transparent'
+              }}
+            >
+              Inventory Logs
+            </button>
+          </nav>
 
-        <StaffModal
-          isOpen={isStaffModalOpen}
-          onClose={closeStaffModal}
-          onSave={editingStaff ? handleUpdateStaff : handleAddStaff}
-          staffToEdit={editingStaff}
-        />
+          <main>
+            {currentView === 'analytics' && <AnalyticsDashboard />}
+            
+            {loading && currentView !== 'analytics' && (
+              <div style={{ padding: '2rem', textAlign: 'center', fontSize: '1.25rem', color: '#6B7280' }}>
+                Loading {currentView} data...
+              </div>
+            )}
+            
+            {!loading && error && currentView !== 'analytics' && (
+               <div style={{ padding: '2rem', textAlign: 'center', fontSize: '1.25rem', color: '#DC2626' }}>
+                Error loading data: {error}
+               </div>
+            )}
+            
+            {!loading && !error && currentView === 'orders' && <OrderManagementTable orders={orders} />}
+            {!loading && !error && currentView === 'menu' && (
+              <MenuManagementTable
+                items={filteredMenuItems} 
+                totalItems={filteredMenuItems.length} 
+                categories={allCategoriesForFilter} 
+                selectedCategory={menuFilterCategory}
+                onFilterChange={handleMenuFilterChange}
+                onClearFilters={handleClearFilters}
+                onAddItem={openModalForAdd}
+                onEditItem={openModalForEdit}
+                onDeleteItem={handleDeleteItem}
+              />
+            )}
+            {!loading && !error && currentView === 'staff' && (
+              <StaffManagementTable
+                staffList={staffList}
+                onAddStaff={openStaffModalForAdd}
+                onEditStaff={openStaffModalForEdit}
+                onDeleteStaff={handleDeleteStaff}
+              />
+            )}
+            {!loading && !error && currentView === 'logs' && <InventoryLogsTable />}
+          </main>
+          
+          <AddItemModal
+            isOpen={isModalOpen}
+            onClose={closeModal}
+            onSave={editingItem ? handleUpdateItem : handleAddNewItem}
+            itemToEdit={editingItem}
+            categories={categories} 
+          />
+
+          <StaffModal
+            isOpen={isStaffModalOpen}
+            onClose={closeStaffModal}
+            onSave={editingStaff ? handleUpdateStaff : handleAddStaff}
+            staffToEdit={editingStaff}
+          />
+        </div>
       </div>
     </>
   );
