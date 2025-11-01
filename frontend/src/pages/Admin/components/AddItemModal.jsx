@@ -103,23 +103,20 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
     setFormData((prevData) => ({ ...prevData, [id]: value }));
   };
   
-  // --- 5. REMOVED handleCategoryDropdownChange and handleNewCategoryNameChange ---
 
   const handleFileUpload = async (e) => {
-      // ... (This function is unchanged) ...
       const file = e.target.files[0];
       if (!file) return;
       const uploadFormData = new FormData();
       uploadFormData.append('image', file);
       setUploading(true);
       try {
+  
         const response = await apiClient('/upload', {
           method: 'POST',
-          headers: {
-            'Content-Type': null, 
-          },
           body: uploadFormData,
         });
+        
         const data = await response.json();
         if (!response.ok) {
           throw new Error(data.message || 'Image upload failed');
