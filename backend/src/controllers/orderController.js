@@ -1,14 +1,11 @@
 import pool from "../config/mysql.js";
 import { validateStock, adjustStock, logOrderStockChange } from "./itemController.js";
 
-// --- (Constants are unchanged) ---
 const SERVICE_RATE = 0.10; // 10%
 const VAT_RATE = 0.12;     // 12%
 
 
-// @desc    Create a new order
-// @route   POST /api/orders
-// @access  Private (Customer)
+// ... (createOrder function is unchanged) ...
 export const createOrder = async (req, res) => {
     const connection = await pool.getConnection();
     try {
@@ -20,17 +17,12 @@ export const createOrder = async (req, res) => {
             throw new Error("Missing required order information.");
         }
         
-        // Create the initial order record
         const orderSql = "INSERT INTO orders (customer_id, order_type, delivery_location, status) VALUES (?, ?, ?, 'Pending')";
         const [orderResult] = await connection.query(orderSql, [customer_id, order_type, delivery_location]);
         const order_id = orderResult.insertId;
 
-        // --- Calculate totals ---
         let calculatedItemsTotal = 0; 
         
-        // --- 1. VALIDATE STOCK IS REMOVED ---
-        // We no longer validate stock on creation.
-
         for (const item of items) {
             const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
@@ -41,12 +33,10 @@ export const createOrder = async (req, res) => {
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
         }
 
-        // --- Perform backend-side financial calculations ---
         const calculatedServiceCharge = calculatedItemsTotal * SERVICE_RATE;
         const calculatedVatAmount = (calculatedItemsTotal + calculatedServiceCharge) * VAT_RATE; 
         const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
 
-        // --- Update the order with the calculated financial data ---
         const updateSql = `
             UPDATE orders 
             SET 
@@ -63,11 +53,6 @@ export const createOrder = async (req, res) => {
             calculatedTotalAmount,
             order_id
         ]);
-
-        // --- 2. DEDUCT STOCK AND LOGS ARE REMOVED ---
-        // await adjustStock(items, 'deduct', connection);
-        // await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
-        // console.log(`Ingredient stock deducted and logged for order ${order_id}`);
 
         await connection.commit();
 
@@ -86,13 +71,25 @@ export const createOrder = async (req, res) => {
     }
 };
 
-// ... (getOrders and getOrderById remain the same) ...
 // @desc    Get all orders
 // @route   GET /api/orders
 // @access  Private
 export const getOrders = async (req, res) => {
     try {
-        const [orders] = await pool.query('SELECT * FROM orders ORDER BY order_date DESC');
+        // --- THIS IS THE FIX ---
+        // We now JOIN the customers table to get the name
+        const sql = `
+            SELECT 
+                o.*,
+                c.first_name,
+                c.last_name
+            FROM orders o
+            LEFT JOIN customers c ON o.customer_id = c.customer_id
+            ORDER BY o.order_date DESC
+        `;
+        const [orders] = await pool.query(sql);
+        // --- END OF FIX ---
+
         res.json(orders);
     } catch (error) {
         console.error("Error fetching orders:", error);
@@ -100,9 +97,7 @@ export const getOrders = async (req, res) => {
     }
 };
 
-// @desc    Get a single order by ID
-// @route   GET /api/orders/:id
-// @access  Private
+// ... (getOrderById function is unchanged) ...
 export const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -116,7 +111,6 @@ export const getOrderById = async (req, res) => {
     }
     const order = orders[0];
 
-    // Fetch ordered items
     const [items] = await pool.query(
     `SELECT mi.item_name, od.quantity, mi.price 
     FROM order_details od 
@@ -125,7 +119,6 @@ export const getOrderById = async (req, res) => {
     [id]
     );
 
-    // Fetch payment info
     const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [id]);
     const payment = payments[0] || {};
 
@@ -150,9 +143,7 @@ export const getOrderById = async (req, res) => {
 };
 
 
-// @desc    Update order operational status (e.g., Preparing, Served)
-// @route   PUT /api/orders/:id/status
-// @access  Private (Staff/Admin)
+// ... (updateOrderStatus function is unchanged) ...
 export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body; 
@@ -161,30 +152,22 @@ export const updateOrderStatus = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // --- 1. GET CURRENT STATUS FIRST ---
-        // Lock the row to prevent race conditions
         const [orders] = await connection.query("SELECT status FROM orders WHERE order_id = ? FOR UPDATE", [id]);
         if (orders.length === 0) {
             throw new Error("Order not found");
         }
         const currentStatus = orders[0].status;
 
-        // --- 2. NEW LOGIC: DEDUCT STOCK WHEN MOVING TO "PREPARING" ---
         if (status.toLowerCase() === 'preparing' && currentStatus === 'pending') {
-            // This is the "Accept" action. We commit ingredients here.
             const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
             
-            // Validate stock BEFORE proceeding
-            await validateStock(details, connection); // Throws error if not enough stock
+            await validateStock(details, connection);
             
-            // Deduct stock and log it
             await adjustStock(details, 'deduct', connection);
             await logOrderStockChange(id, details, 'ORDER_DEDUCT', connection);
             console.log(`Ingredient stock deducted and logged for order ${id}`);
         }
-        // --- 3. MODIFIED LOGIC: RESTORE STOCK ONLY IF IT WAS DEDUCTED ---
         else if (status.toLowerCase() === 'cancelled') {
-            // Only restore stock if the order was in a state where stock was already taken
             if (currentStatus === 'preparing' || currentStatus === 'ready') {
                 const [payments] = await connection.query("SELECT * FROM payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
 
@@ -194,18 +177,14 @@ export const updateOrderStatus = async (req, res) => {
                     console.log(`Restoring ingredient stock for cancelled unpaid order: ${id}`);
                     const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
                     
-                    // Restore stock
                     await adjustStock(details, 'restore', connection);
                     await logOrderStockChange(id, details, 'ORDER_RESTORE', connection);
                 }
             }
-            // If currentStatus is 'pending', no stock was taken, so we do nothing.
         }
 
-        // --- 4. UPDATE STATUS (This runs for all status changes) ---
         const [result] = await connection.query("UPDATE orders SET status = ? WHERE order_id = ?", [status, id]);
         if (result.affectedRows === 0) {
-            // This case should be caught by the check above, but good to keep
             throw new Error("Order not found");
         }
 
@@ -214,13 +193,10 @@ export const updateOrderStatus = async (req, res) => {
 
     } catch (error) {
         await connection.rollback();
-        // --- 5. CATCH VALIDATION ERRORS ---
-        // Send a 400 (Bad Request) if stock validation fails, so the kitchen UI can display it.
         if (error.message.startsWith("Not enough stock")) {
             console.error(`Stock validation failed for order ${id}: ${error.message}`);
             return res.status(400).json({ message: error.message });
         }
-        // Otherwise, send a generic 500 error.
         res.status(500).json({ message: "Failed to update order status", error: error.message });
     } finally {
         connection.release();
@@ -228,10 +204,7 @@ export const updateOrderStatus = async (req, res) => {
 };
 
 
-// ... (getKitchenOrders and getServedOrders remain the same) ...
-// @desc    Get orders for the kitchen
-// @route   GET /api/orders/kitchen
-// @access  Private (Staff)
+// ... (getKitchenOrders and getServedOrders are unchanged) ...
 export const getKitchenOrders = async (req, res) => {
     try {
         const sql = `
@@ -252,9 +225,6 @@ export const getKitchenOrders = async (req, res) => {
     }
 };
 
-// @desc    Get served/completed orders
-// @route   GET /api/orders/served
-// @access  Private (Staff)
 export const getServedOrders = async (req, res) => {
     try {
         const sql = `

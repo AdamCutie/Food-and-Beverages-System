@@ -8,9 +8,8 @@ import StaffManagementTable from './components/StaffManagementTable';
 import StaffModal from './components/StaffModal';
 import InventoryLogsTable from './components/InventoryLogsTable';
 import { useAuth } from '../../context/AuthContext';
-import apiClient from '../../utils/apiClient'; // <-- This should already be here
+import apiClient from '../../utils/apiClient';
 
-// ... (OrderManagementTable component is unchanged) ...
 const OrderManagementTable = ({ orders }) => (
   <div className="bg-white shadow-md rounded-lg overflow-hidden">
     <h2 className="text-2xl font-bold p-6">Order Management</h2>
@@ -18,7 +17,8 @@ const OrderManagementTable = ({ orders }) => (
       <thead>
         <tr className="bg-gray-100 text-gray-600 uppercase text-sm leading-normal">
           <th className="py-3 px-6 text-left">Order ID</th>
-          <th className="py-3 px-6 text-left">Cust. ID</th>
+          {/* --- 1. HEADER FIX --- */}
+          <th className="py-3 px-6 text-left">Customer Name</th>
           <th className="py-3 px-6 text-left">Type</th>
           <th className="py-3 px-6 text-left">Location</th>
           <th className="py-3 px-6 text-center">Total</th>
@@ -30,10 +30,18 @@ const OrderManagementTable = ({ orders }) => (
         {orders.map((order) => (
           <tr key={order.order_id} className="border-b border-gray-200 hover:bg-gray-50">
             <td className="py-3 px-6 text-left whitespace-nowrap">{order.order_id}</td>
-            <td className="py-3 px-6 text-left">{order.customer_id}</td>
+            
+            {/* --- 2. DATA CELL FIX --- */}
+            {/* Display name, or "Guest" if customer_id was NULL */}
+            <td className="py-3 px-6 text-left">
+              {order.first_name || order.last_name ? `${order.first_name} ${order.last_name}` : 'Guest'}
+            </td>
+
             <td className="py-3 px-6 text-left">{order.order_type}</td>
             <td className="py-3 px-6 text-left">{order.delivery_location}</td>
-            <td className="py-3 px-6 text-center">₱{parseFloat(order.total_amount).toFixed(2)}</td>
+            <td className="py-3 px-6 text-center">
+              ₱{parseFloat(order.total_amount || 0).toFixed(2)}
+            </td>
             <td className="py-3 px-6 text-center">
               <span
                 className={`py-1 px-3 rounded-full text-xs font-semibold ${
@@ -55,10 +63,11 @@ const OrderManagementTable = ({ orders }) => (
 );
 
 function AdminPage() {
+  // ... (Rest of the file is unchanged) ...
   const [orders, setOrders] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [staffList, setStaffList] = useState([]);
-  const [categories, setCategories] = useState([]); // <-- 1. ADD NEW STATE
+  const [categories, setCategories] = useState([]); 
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState('orders'); 
@@ -75,12 +84,11 @@ function AdminPage() {
       try {
         setLoading(true);
         
-        // --- 2. FETCH CATEGORIES ---
         const [ordersResponse, itemsResponse, staffResponse, categoriesResponse] = await Promise.all([
           apiClient('/orders'),
           apiClient('/items'),
           apiClient('/admin/staff'),
-          apiClient('/categories') // <-- Add this call
+          apiClient('/categories') 
         ]);
         
         if (!ordersResponse.ok || !itemsResponse.ok || !staffResponse.ok || !categoriesResponse.ok) {
@@ -90,12 +98,12 @@ function AdminPage() {
         const ordersData = await ordersResponse.json();
         const itemsData = await itemsResponse.json();
         const staffData = await staffResponse.json();
-        const categoriesData = await categoriesResponse.json(); // <-- Get data
+        const categoriesData = await categoriesResponse.json(); 
 
         setOrders(ordersData);
         setMenuItems(itemsData);
         setStaffList(staffData);
-        setCategories(categoriesData); // <-- 3. SET STATE
+        setCategories(categoriesData);
         
       } catch (err) {
         if (err.message !== 'Session expired') {
@@ -110,7 +118,6 @@ function AdminPage() {
     }
   }, [token]);
 
-  // ... (All handler functions are unchanged) ...
   const handleAddNewItem = async (formData) => {
     const payload = {
       ...formData,
@@ -313,14 +320,6 @@ const openModalForEdit = (item) => {
    if (loading) return <div className="p-8">Loading dashboard...</div>;
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
   
-  // --- 4. REMOVE OLD LOGIC ---
-  // const uniqueCategories = ['All', ...new Set(menuItems.map(item => item.category))];
-  // const allCategories = ['All', ...new Set(menuItems.map(item => item.category))];
-  // const categoriesForForm = allCategories.filter(c => c !== 'All');
-  
-  // --- 5. UPDATE FILTER LOGIC ---
-  // We can still auto-generate the filter tabs from the *items* for the Admin page,
-  // as this is a good way to see what's in use.
   const allCategoriesForFilter = ['All', ...new Set(menuItems.map(item => item.category))];
 
   const filteredMenuItems = menuItems.filter(item => 
@@ -382,7 +381,7 @@ const openModalForEdit = (item) => {
             <MenuManagementTable
               items={filteredMenuItems} 
               totalItems={filteredMenuItems.length} 
-              categories={allCategoriesForFilter} // <-- 6. Use the auto-gen list for *filtering*
+              categories={allCategoriesForFilter} 
               selectedCategory={menuFilterCategory}
               onFilterChange={handleMenuFilterChange}
               onClearFilters={handleClearFilters}
@@ -409,7 +408,7 @@ const openModalForEdit = (item) => {
           onClose={closeModal}
           onSave={editingItem ? handleUpdateItem : handleAddNewItem}
           itemToEdit={editingItem}
-          categories={categories} // <-- 7. PASS THE FETCHED LIST TO THE MODAL
+          categories={categories} 
         />
 
         <StaffModal
