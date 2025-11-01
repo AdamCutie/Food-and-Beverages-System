@@ -1,10 +1,8 @@
-
 import React from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 
-// Destructure the correct props: onAddItem, onEditItem, onDeleteItem
 const MenuManagementTable = ({ 
-  items, // This is now the filtered list
+  items,
   totalItems, 
   categories, 
   selectedCategory,
@@ -18,7 +16,6 @@ const MenuManagementTable = ({
     <div className="mt-12">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Menu Management</h2>
-        {/* This button now calls the onAddItem function from the parent */}
         <button
           onClick={onAddItem}
           className="bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-600 transition-colors"
@@ -27,7 +24,6 @@ const MenuManagementTable = ({
         </button>
       </div>
 
-      {/* --- NEW Filter Controls --- */}
       <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-md shadow">
         <div>
           <label htmlFor="categoryFilter" className="mr-2 text-sm font-medium text-gray-700">Filter by Category:</label>
@@ -46,7 +42,7 @@ const MenuManagementTable = ({
         <button 
           onClick={onClearFilters}
           className="text-sm text-blue-500 hover:underline"
-          disabled={selectedCategory === 'All'} // Disable if already showing all
+          disabled={selectedCategory === 'All'}
         >
           Clear Filters
         </button>
@@ -59,7 +55,7 @@ const MenuManagementTable = ({
               <th className="py-3 px-6 text-left">Item Name</th>
               <th className="py-3 px-6 text-left">Category</th>
               <th className="py-3 px-6 text-center">Price</th>
-              <th className="py-3 px-6 text-center">Stock</th>
+              {/* --- STOCK COLUMN REMOVED --- */}
               <th className="py-3 px-6 text-center">Actions</th>
             </tr>
           </thead>
@@ -75,12 +71,11 @@ const MenuManagementTable = ({
                 <td className="py-3 px-6 text-center">
                   <span>₱{parseFloat(item.price).toFixed(2)}</span>
                 </td>
-                <td className="py-3 px-6 text-center">
-                  <span>{item.stock}</span>
-                </td>
+                
+                {/* --- STOCK COLUMN REMOVED --- */}
+                
                 <td className="py-3 px-6 text-center">
                   <div className="flex item-center justify-center gap-4">
-                    {/* This button now calls the onEditItem function from the parent */}
                     <button 
                       onClick={() => onEditItem(item)} 
                       className="text-blue-500 hover:text-blue-700"
