@@ -38,13 +38,10 @@ const InternalNavBar = () => {
         <Link to="/kitchen">
           <img src="/images/logo_var.svg" alt="Logo" style={{ height: '64px' }} />
         </Link>
-        <h1 style={{ fontSize: '20px', fontWeight: 'bold' }}>
-          Staff Portal
-        </h1>
       </div>
 
       {/* Center: Navigation Links (Kitchen ONLY) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '100px' }}>
         <NavLink
           to="/kitchen"
           end
@@ -53,6 +50,15 @@ const InternalNavBar = () => {
           Kitchen
         </NavLink>
         
+        {/* --- NEW LINK ADDED HERE --- */}
+        <NavLink
+          to="/kitchen/pos"
+          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
+        >
+          Walk-in
+        </NavLink>
+        {/* --- END OF NEW LINK --- */}
+
         <NavLink
           to="/kitchen/inventory"
           style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}

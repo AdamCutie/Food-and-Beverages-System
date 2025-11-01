@@ -5,20 +5,46 @@ import {
     getOrderById,
     updateOrderStatus,
     getKitchenOrders,
-    getServedOrders
+    getServedOrders,
+    createPosOrder 
 } from "../controllers/orderController.js";
-// --- 1. IMPORT protect ---
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get('/kitchen', getKitchenOrders); // staff
-router.get('/served', getServedOrders);
+// --- 1. ADD 'protect' and 'authorizeRoles' TO THESE ROUTES ---
+router.get(
+    '/kitchen', 
+    protect, 
+    authorizeRoles("admin", "waiter", "cashier"), 
+    getKitchenOrders
+); 
+router.get(
+    '/served', 
+    protect, 
+    authorizeRoles("admin", "waiter", "cashier"), 
+    getServedOrders
+);
+// --- END OF CHANGE ---
 
-// --- 2. ADD 'protect' MIDDLEWARE ---
+router.post(
+    "/pos", 
+    protect, 
+    authorizeRoles("admin", "waiter", "cashier"), 
+    createPosOrder
+);
+
 router.post("/", protect, createOrder); 
 router.get("/", getOrders); // admin
 router.get("/:id", getOrderById);
-router.put("/:id/status", updateOrderStatus);
+
+// --- 2. ADD 'protect' and 'authorizeRoles' TO THIS ROUTE ---
+router.put(
+    "/:id/status", 
+    protect, 
+    authorizeRoles("admin", "waiter", "cashier"), 
+    updateOrderStatus
+);
+// --- END OF CHANGE ---
 
 export default router;

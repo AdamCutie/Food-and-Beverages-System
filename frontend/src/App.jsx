@@ -14,8 +14,10 @@ import NotAuthorizedPage from './pages/Auth/NotAuthorizedPage';
 import PaymentSuccess from './pages/Customer/PaymentSuccess.jsx';
 import PaymentCancel from './pages/Customer/PaymentCancel.jsx';
 
-// --- NEW: Import the page we are about to create ---
 import InventoryPage from './pages/Kitchen/InventoryPage.jsx';
+
+// --- NEW: Import the POS Page ---
+import PosPage from './pages/Kitchen/PosPage.jsx';
 
 // Import Route Handlers
 import ProtectedRoute from './components/routing/ProtectedRoute';
@@ -71,7 +73,16 @@ function App() {
           }
         />
         
-        {/* --- NEW: Add the Inventory Page Route --- */}
+        {/* --- NEW: Add the POS Page Route --- */}
+        <Route
+          path="/kitchen/pos"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier']}>
+              <PosPage />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/kitchen/inventory"
           element={
