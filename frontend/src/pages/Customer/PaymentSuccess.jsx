@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
 import ReceiptModal from "./components/ReceiptModal";
 import toast from "react-hot-toast";
+import apiClient from '../../utils/apiClient'; // <-- 1. IMPORT
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
@@ -16,7 +17,9 @@ const PaymentSuccess = () => {
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/orders/${orderId}`);
+        // --- 2. USE apiClient ---
+        // This request needs a token, which apiClient will add
+        const response = await apiClient(`/orders/${orderId}`);
         if (!response.ok) throw new Error("Failed to fetch order details");
         const data = await response.json();
 
@@ -30,10 +33,12 @@ const PaymentSuccess = () => {
           payment_method: data.payment_method || "PayMongo Checkout",
         });
 
-        setIsOpen(true); // ✅ Automatically open modal
+        setIsOpen(true);
       } catch (err) {
-        console.error("Error fetching order details:", err);
-        toast.error("Unable to load receipt.");
+         if (err.message !== 'Session expired') {
+          console.error("Error fetching order details:", err);
+          toast.error("Unable to load receipt.");
+        }
       }
     };
 
@@ -42,9 +47,10 @@ const PaymentSuccess = () => {
 
   const handleClose = () => {
     setIsOpen(false);
-    navigate("/"); // Return to main menu after closing
+    navigate("/");
   };
 
+  // ... (JSX return is unchanged) ...
   return (
     <div className="min-h-screen flex flex-col justify-center items-center bg-green-50 text-center p-6">
       <CheckCircle className="w-20 h-20 text-green-600 mb-4 animate-bounce" />
@@ -53,7 +59,6 @@ const PaymentSuccess = () => {
       </h1>
       <p className="text-gray-600 mb-6">Generating your receipt...</p>
 
-      {/* ✅ Show the receipt modal */}
       <ReceiptModal
         isOpen={isOpen}
         onClose={handleClose}

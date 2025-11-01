@@ -1,40 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import InternalNavBar from './components/InternalNavBar'; // --- 1. IMPORT THE NAVBAR ---
-import { useAuth } from '../../context/AuthContext'; // --- 2. IMPORT useAuth ---
+import InternalNavBar from './components/InternalNavBar';
+import { useAuth } from '../../context/AuthContext';
+import apiClient from '../../utils/apiClient'; // <-- 1. IMPORT
 
 function ArchivePage() {
   const [servedOrders, setServedOrders] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { token } = useAuth(); // --- 3. GET TOKEN ---
+  const { token } = useAuth();
 
   useEffect(() => {
     const fetchServedOrders = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:3000/api/orders/served', {
-            headers: { // --- 4. ADD AUTHORIZATION HEADER ---
-              'Authorization': `Bearer ${token}`
-            }
-        }); 
+        // --- 2. USE apiClient ---
+        const response = await apiClient('/orders/served'); // No headers
         if (!response.ok) {
           throw new Error('Failed to fetch served orders');
         }
         const data = await response.json();
         setServedOrders(data);
       } catch (err) {
-        setError(err.message);
+         if (err.message !== 'Session expired') {
+          setError(err.message);
+        }
       } finally {
         setLoading(false);
       }
     };
     
-    if (token) { // --- 5. ONLY FETCH IF TOKEN EXISTS ---
+    if (token) {
         fetchServedOrders();
     }
-  }, [token]); // --- 6. ADD TOKEN TO DEPENDENCY ARRAY ---
+  }, [token]);
 
+  // ... (Rest of component JSX is unchanged) ...
   if (loading) return (
     <>
       <InternalNavBar /> 
@@ -51,7 +52,7 @@ function ArchivePage() {
 
   return (
     <>
-      <InternalNavBar /> {/* --- 7. ADD THE NAVBAR HERE --- */}
+      <InternalNavBar />
       <div className="bg-figma-cream min-h-screen px-4 py-8">
         <div className="container mx-auto">
           <h1 className="text-3xl font-bold mb-6 text-center text-figma-dark-green">Served Orders Archive</h1>
@@ -73,10 +74,6 @@ function ArchivePage() {
               ))}
             </div>
           )}
-          {/* We don't need the link below anymore since the navbar has navigation */}
-          {/* <div className="mt-8 text-center">
-            <Link to="/kitchen" className="text-blue-500 hover:underline">&larr; Back to Kitchen Display</Link>
-          </div> */}
         </div>
       </div>
     </>

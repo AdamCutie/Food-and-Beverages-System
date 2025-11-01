@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import InternalNavBar from './components/InternalNavBar';
+import apiClient from '../../utils/apiClient'; // <-- 1. IMPORT
 
 function KitchenPage() {
   const [kitchenOrders, setKitchenOrders] = useState([]);
@@ -13,14 +14,17 @@ function KitchenPage() {
 
   const fetchOrderDetails = async (orderId) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/orders/${orderId}`);
+      // --- 2. USE apiClient ---
+      const response = await apiClient(`/orders/${orderId}`); // No headers
       if (!response.ok) {
         console.error(`Failed to fetch details for order ${orderId}`);
         return null;
       }
       return await response.json();
     } catch (err) {
-      console.error(`Error fetching details for order ${orderId}:`, err);
+      if (err.message !== 'Session expired') {
+        console.error(`Error fetching details for order ${orderId}:`, err);
+      }
       return null;
     }
   };
@@ -32,7 +36,8 @@ function KitchenPage() {
       setError(null);
 
       try {
-        const listResponse = await fetch('http://localhost:3000/api/orders/kitchen');
+        // --- 3. USE apiClient ---
+        const listResponse = await apiClient('/orders/kitchen'); // No headers
         if (!listResponse.ok) {
           throw new Error('Failed to fetch kitchen orders list');
         }
@@ -56,8 +61,10 @@ function KitchenPage() {
             setKitchenOrders([]); 
         }
       } catch (err) {
-        setError(err.message);
-        setKitchenOrders([]);
+         if (err.message !== 'Session expired') {
+          setError(err.message);
+          setKitchenOrders([]);
+        }
       } finally {
         if (isInitialLoad) setLoading(false);
         setIsPolling(false);
@@ -67,9 +74,10 @@ function KitchenPage() {
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/orders/${orderId}/status`, {
+      // --- 4. USE apiClient ---
+      const response = await apiClient(`/orders/${orderId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        // No headers
         body: JSON.stringify({ status: newStatus.toLowerCase() }),
       });
 
@@ -80,6 +88,7 @@ function KitchenPage() {
       }
 
       setKitchenOrders(currentOrders => {
+        // ... (rest of function is unchanged) ...
         if (!Array.isArray(currentOrders)) {
             console.error("Error: kitchenOrders state was not an array during update.");
             return []; 
@@ -94,12 +103,14 @@ function KitchenPage() {
       });
       toast.success(`Order #${orderId} marked as ${newStatus}`);
     } catch (err) {
-      console.error("Status update error:", err);
-      toast.error(err.message);
+       if (err.message !== 'Session expired') {
+        console.error("Status update error:", err);
+        toast.error(err.message);
+      }
     }
   };
 
-
+  // ... (useEffect and JSX render logic is unchanged) ...
   useEffect(() => {
     fetchAndPopulateOrders(true);
     const intervalId = setInterval(() => {
@@ -130,9 +141,7 @@ function KitchenPage() {
         
         {error && <p className="text-center text-red-500 text-sm mb-4">Error fetching updates: {error}</p>}
 
-        {/*  Dropdown Filters Container --- */}
         <div className="bg-figma-off-white p-4 rounded-lg shadow-md mb-6 flex flex-col md:flex-row justify-around items-center gap-4">
-          {/* Filter by Status Dropdown */}
           <div className="flex flex-col w-full md:w-1/2 lg:w-1/3">
             <label htmlFor="status-filter" className="text-sm font-semibold mb-1">Filter by Status</label>
             <select
@@ -145,11 +154,9 @@ function KitchenPage() {
               <option value="Pending">Pending</option>
               <option value="Preparing">Preparing</option>
               <option value="Ready">Ready</option>
-              {/* Served orders are removed from kitchenOrders, so they won't appear here */}
             </select>
           </div>
 
-          {/* Filter by Type Dropdown */}
           <div className="flex flex-col w-full md:w-1/2 lg:w-1/3">
             <label htmlFor="type-filter" className="text-sm font-semibold mb-1">Filter by Type</label>
             <select

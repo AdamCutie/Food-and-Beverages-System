@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jwtDecode } from 'jwt-decode'; // Corrected import
 import toast from 'react-hot-toast';
+import apiClient from '../utils/apiClient'; 
 
 const AuthContext = createContext(null);
 
@@ -65,9 +66,8 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await apiClient('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
@@ -96,12 +96,11 @@ export const AuthProvider = ({ children }) => {
   // Register function (for customers only)
   const register = async (firstName, lastName, email, password, phone) => {
     try {
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await apiClient('/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          first_name: firstName, // --- FIX ---
-          last_name: lastName,   // --- FIX ---
+          first_name: firstName,
+          last_name: lastName,
           email,
           password,
           phone,

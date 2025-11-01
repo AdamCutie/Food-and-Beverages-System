@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { X, UploadCloud, PlusCircle, Trash2 } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext'; // --- 1. IMPORT useAuth ---
+import { useAuth } from '../../../context/AuthContext';
+import apiClient from '../../../utils/apiClient'; 
 
 const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) => {
-  const { token } = useAuth(); // --- 2. GET TOKEN ---
+  const { token } = useAuth();
 
   const [formData, setFormData] = useState({
     item_name: '',
@@ -12,7 +13,7 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
     category: '',
     price: '',
     image_url: '',
-    ingredients: [], // --- 3. ADD INGREDIENTS ARRAY ---
+    ingredients: [], 
   });
   const [uploading, setUploading] = useState(false);
   const isEditMode = Boolean(itemToEdit);
@@ -21,19 +22,16 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
   const [newCategoryName, setNewCategoryName] = useState('');
   const showNewCategoryInput = selectedDropdownCategory === 'ADD_NEW';
 
-  // --- 4. NEW STATE FOR RECIPE BUILDER ---
+
   const [availableIngredients, setAvailableIngredients] = useState([]);
   const [selectedIngredientId, setSelectedIngredientId] = useState('');
   const [ingredientQuantity, setIngredientQuantity] = useState('');
 
-  // --- 5. FETCH ALL INGREDIENTS WHEN MODAL OPENS ---
   useEffect(() => {
     if (isOpen) {
       const fetchIngredients = async () => {
         try {
-          const res = await fetch('http://localhost:3000/api/inventory', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          const res = await apiClient('/inventory');
           if (!res.ok) throw new Error('Failed to fetch ingredients');
           const data = await res.json();
           setAvailableIngredients(data);
@@ -48,7 +46,7 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
         // Fetch the item's details again to get its recipe
         const fetchItemDetails = async () => {
           try {
-            const res = await fetch(`http://localhost:3000/api/items/${itemToEdit.item_id}`);
+            const res = await apiClient(`/items/${itemToEdit.item_id}`);
             if (!res.ok) throw new Error("Failed to fetch item's recipe");
             const data = await res.json();
             
@@ -124,11 +122,14 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
       uploadFormData.append('image', file);
       setUploading(true);
       try {
-        const response = await fetch('http://localhost:3000/api/upload', {
+        const response = await apiClient('/upload', {
           method: 'POST',
-          // No auth token needed for this specific route if configured that way
+          headers: {
+            'Content-Type': null, // Tell apiClient to *not* set Content-Type
+          },
           body: uploadFormData,
         });
+        
         const data = await response.json();
         if (!response.ok) {
           throw new Error(data.message || 'Image upload failed');

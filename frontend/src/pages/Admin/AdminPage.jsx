@@ -8,7 +8,9 @@ import StaffManagementTable from './components/StaffManagementTable';
 import StaffModal from './components/StaffModal';
 import InventoryLogsTable from './components/InventoryLogsTable';
 import { useAuth } from '../../context/AuthContext';
+import apiClient from '../../utils/apiClient'; 
 
+// ... (OrderManagementTable component is unchanged) ...
 const OrderManagementTable = ({ orders }) => (
   <div className="bg-white shadow-md rounded-lg overflow-hidden">
     <h2 className="text-2xl font-bold p-6">Order Management</h2>
@@ -52,8 +54,8 @@ const OrderManagementTable = ({ orders }) => (
   </div>
 );
 
+
 function AdminPage() {
-  // ... (All state definitions are unchanged) ...
   const [orders, setOrders] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -66,23 +68,24 @@ function AdminPage() {
   const [editingStaff, setEditingStaff] = useState(null);
   const [menuFilterCategory, setMenuFilterCategory] = useState('All');
 
-  const { token } = useAuth();
+  const { token } = useAuth(); // We still need token to trigger useEffect
   
-  // ... (useEffect and all handler functions are unchanged) ...
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const headers = {
-          'Authorization': `Bearer ${token}`
-        };
-
+        // --- 2. USE apiClient ---
+        // The apiClient automatically adds the token
         const [ordersResponse, itemsResponse, staffResponse] = await Promise.all([
-          fetch('http://localhost:3000/api/orders'),
-          fetch('http://localhost:3000/api/items'),
-          fetch('http://localhost:3000/api/admin/staff', { headers }) 
+          apiClient('/orders'), // No headers needed
+          apiClient('/items'),   // No headers needed
+          apiClient('/admin/staff') // No headers needed
         ]);
-        if (!ordersResponse.ok || !itemsResponse.ok) throw new Error('Failed to fetch data');
+        
+        if (!ordersResponse.ok || !itemsResponse.ok || !staffResponse.ok) {
+           throw new Error('Failed to fetch data');
+        }
+        
         const ordersData = await ordersResponse.json();
         const itemsData = await itemsResponse.json();
         const staffData = await staffResponse.json();
@@ -91,13 +94,16 @@ function AdminPage() {
         setMenuItems(itemsData);
         setStaffList(staffData);
       } catch (err) {
-        setError(err.message);
+        // If it's a 401, apiClient handles it. This catches other errors.
+        if (err.message !== 'Session expired') {
+          setError(err.message);
+        }
       } finally {
         setLoading(false);
       }
     };
     if (token) {
-    fetchData();
+      fetchData();
     }
   }, [token]);
 
@@ -111,12 +117,10 @@ function AdminPage() {
     };
     
     try {
-      const response = await fetch('http://localhost:3000/api/admin/items', { 
+      // --- 3. USE apiClient ---
+      const response = await apiClient('/admin/items', { 
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
+        // No headers needed, apiClient adds them
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
@@ -124,14 +128,16 @@ function AdminPage() {
          throw new Error(errData.message || 'Failed to save the item.');
       }
       
-      const itemsResponse = await fetch('http://localhost:3000/api/items');
+      const itemsResponse = await apiClient('/items'); // <-- USE apiClient
       const itemsData = await itemsResponse.json();
       setMenuItems(itemsData);
 
       toast.success('Item added successfully!'); 
       closeModal(); 
     } catch (error) {
-      toast.error(error.message);
+       if (error.message !== 'Session expired') {
+        toast.error(error.message);
+      }
     }
   };
 
@@ -145,12 +151,10 @@ function AdminPage() {
     };
     
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/items/${editingItem.item_id}`, { 
+      // --- 4. USE apiClient ---
+      const response = await apiClient(`/admin/items/${editingItem.item_id}`, { 
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
+        // No headers needed
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
@@ -158,14 +162,16 @@ function AdminPage() {
          throw new Error(errData.message || 'Failed to update item.');
       }
       
-      const itemsResponse = await fetch('http://localhost:3000/api/items');
+      const itemsResponse = await apiClient('/items'); // <-- USE apiClient
       const itemsData = await itemsResponse.json();
       setMenuItems(itemsData);
 
       toast.success('Item updated successfully!');
       closeModal();
     } catch (error) {
-      toast.error(error.message);
+       if (error.message !== 'Session expired') {
+        toast.error(error.message);
+      }
     }
   };
 
@@ -173,11 +179,10 @@ function AdminPage() {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
     
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/items/${itemIdToDelete}`, { 
+      // --- 5. USE apiClient ---
+      const response = await apiClient(`/admin/items/${itemIdToDelete}`, { 
         method: 'DELETE',
-        headers: { 
-          'Authorization': `Bearer ${token}` 
-        }
+        // No headers needed
       });
       if (!response.ok) {
          const errData = await response.json();
@@ -186,24 +191,26 @@ function AdminPage() {
       setMenuItems(prevItems => prevItems.filter(item => item.item_id !== itemIdToDelete));
       toast.success('Item deleted successfully!');
     } catch (error) {
-      toast.error(error.message);
+       if (error.message !== 'Session expired') {
+        toast.error(error.message);
+      }
     }
   };
 
-const openModalForEdit = (item) => {
+  // ... (openModalForEdit, openModalForAdd, closeModal are unchanged) ...
+  const openModalForEdit = (item) => {
     setEditingItem(item);
     setIsModalOpen(true);
   };
-  
   const openModalForAdd = () => {
     setEditingItem(null);
     setIsModalOpen(true);
   };
-
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingItem(null);
   };
+
 
   const handleMenuFilterChange = (category) => {
     setMenuFilterCategory(category);
@@ -215,29 +222,27 @@ const openModalForEdit = (item) => {
 
   const handleAddStaff = async (formData) => {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/staff', {
+      // --- 6. USE apiClient ---
+      const response = await apiClient('/admin/staff', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        // No headers
         body: JSON.stringify(formData),
       });
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.message || 'Failed to save the staff member.');
       }
-      const newStaff = await response.json(); 
-      const listResponse = await fetch('http://localhost:3000/api/admin/staff', { 
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      
+      const listResponse = await apiClient('/admin/staff'); // <-- USE apiClient
       const updatedList = await listResponse.json();
       setStaffList(updatedList);
       
       toast.success('Staff member added successfully!');
       closeStaffModal();
     } catch (error) {
-      toast.error(error.message);
+       if (error.message !== 'Session expired') {
+        toast.error(error.message);
+      }
     }
   };
 
@@ -248,12 +253,10 @@ const openModalForEdit = (item) => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/staff/${editingStaff.staff_id}`, {
+      // --- 7. USE apiClient ---
+      const response = await apiClient(`/admin/staff/${editingStaff.staff_id}`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        // No headers
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
@@ -261,27 +264,26 @@ const openModalForEdit = (item) => {
         throw new Error(errData.message || 'Failed to update staff member.');
       }
       
-      const listResponse = await fetch('http://localhost:3000/api/admin/staff', { 
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const listResponse = await apiClient('/admin/staff'); // <-- USE apiClient
       const updatedList = await listResponse.json();
       setStaffList(updatedList);
 
       toast.success('Staff member updated successfully!');
       closeStaffModal();
     } catch (error) {
-      toast.error(error.message);
+       if (error.message !== 'Session expired') {
+        toast.error(error.message);
+      }
     }
   };
 
   const handleDeleteStaff = async (staffIdToDelete) => {
     if (!window.confirm('Are you sure you want to delete this staff account?')) return;
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/staff/${staffIdToDelete}`, {
+      // --- 8. USE apiClient ---
+      const response = await apiClient(`/admin/staff/${staffIdToDelete}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        // No headers
       });
       if (!response.ok) {
         const errData = await response.json();
@@ -290,28 +292,28 @@ const openModalForEdit = (item) => {
       setStaffList(prevList => prevList.filter(staff => staff.staff_id !== staffIdToDelete));
       toast.success('Staff member deleted successfully!');
     } catch (error) {
-      toast.error(error.message);
+       if (error.message !== 'Session expired') {
+        toast.error(error.message);
+      }
     }
   };
 
+  // ... (openStaffModalForEdit, openStaffModalForAdd, closeStaffModal are unchanged) ...
   const openStaffModalForEdit = (staff) => {
     setEditingStaff(staff);
     setIsStaffModalOpen(true);
   };
-  
   const openStaffModalForAdd = () => {
     setEditingStaff(null);
     setIsStaffModalOpen(true);
   };
-
   const closeStaffModal = () => {
     setIsStaffModalOpen(false);
     setEditingStaff(null);
   };
 
-  // ... (rest of the file is unchanged) ...
-  // (The main return statement is unchanged, it will just use the new import paths)
-   if (loading) return <div className="p-8">Loading dashboard...</div>;
+
+  if (loading) return <div className="p-8">Loading dashboard...</div>;
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
   
   const uniqueCategories = ['All', ...new Set(menuItems.map(item => item.category))];

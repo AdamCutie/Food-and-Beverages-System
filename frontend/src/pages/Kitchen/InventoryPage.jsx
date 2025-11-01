@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import InternalNavBar from './components/InternalNavBar';
 import IngredientModal from './components/IngredientModal'; 
 import AdjustStockModal from './components/AdjustStockModal'; 
+import apiClient from '../../utils/apiClient'; // <-- 1. IMPORT
 
 const InventoryPage = () => {
   const [ingredients, setIngredients] = useState([]);
@@ -16,26 +17,22 @@ const InventoryPage = () => {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
 
-  // --- Data Fetching ---
   const fetchIngredients = async () => {
-    // We don't need to set loading to true for a refetch
-    // setLoading(true); 
     try {
-      const response = await fetch('http://localhost:3000/api/inventory', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // --- 2. USE apiClient ---
+      const response = await apiClient('/inventory'); // No headers
       if (!response.ok) {
         throw new Error('Failed to fetch ingredients.');
       }
       const data = await response.json();
       setIngredients(data);
     } catch (err) {
-      setError(err.message);
-      toast.error(err.message);
+       if (err.message !== 'Session expired') {
+        setError(err.message);
+        toast.error(err.message);
+      }
     } finally {
-      setLoading(false); // Only set loading false on initial load
+      setLoading(false); 
     }
   };
 
@@ -45,45 +42,39 @@ const InventoryPage = () => {
     }
   }, [token]);
 
-  // --- Modal Handlers ---
+  // ... (Modal handlers are unchanged) ...
   const handleOpenAddModal = () => {
     setSelectedIngredient(null);
     setIsIngredientModalOpen(true);
   };
-
   const handleOpenEditModal = (ingredient) => {
     setSelectedIngredient(ingredient);
     setIsIngredientModalOpen(true);
   };
-
-  // --- 2. UPDATE ADJUST MODAL HANDLER ---
   const handleOpenAdjustModal = (ingredient) => {
     setSelectedIngredient(ingredient);
-    setIsAdjustModalOpen(true); // Uncommented
+    setIsAdjustModalOpen(true);
   };
-
   const handleCloseModals = () => {
     setIsIngredientModalOpen(false);
     setIsAdjustModalOpen(false);
     setSelectedIngredient(null);
   };
 
-  // --- API Call Handlers ---
+
   const handleSaveIngredient = async (formData) => {
     const isEditMode = Boolean(selectedIngredient);
     const url = isEditMode
-      ? `http://localhost:3000/api/inventory/${selectedIngredient.ingredient_id}`
-      : 'http://localhost:3000/api/inventory';
+      ? `/inventory/${selectedIngredient.ingredient_id}`
+      : '/inventory';
     
     const method = isEditMode ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(url, {
+      // --- 3. USE apiClient ---
+      const response = await apiClient(url, {
         method: method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        // No headers
         body: JSON.stringify(formData),
       });
 
@@ -94,25 +85,24 @@ const InventoryPage = () => {
 
       toast.success(`Ingredient ${isEditMode ? 'updated' : 'created'} successfully!`);
       handleCloseModals();
-      fetchIngredients(); // Refetch list
+      fetchIngredients(); 
     } catch (err) {
-      toast.error(err.message);
+       if (err.message !== 'Session expired') {
+        toast.error(err.message);
+      }
     }
   };
 
-  // --- 3. ADD REAL API LOGIC FOR ADJUST STOCK ---
   const handleAdjustStock = async (formData) => {
     if (!selectedIngredient) return;
 
-    const url = `http://localhost:3000/api/inventory/${selectedIngredient.ingredient_id}/stock`;
+    const url = `/inventory/${selectedIngredient.ingredient_id}/stock`;
 
     try {
-        const response = await fetch(url, {
+        // --- 4. USE apiClient ---
+        const response = await apiClient(url, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
+            // No headers
             body: JSON.stringify(formData),
         });
         
@@ -123,14 +113,16 @@ const InventoryPage = () => {
         
         toast.success('Stock adjusted successfully!');
         handleCloseModals();
-        fetchIngredients(); // Refetch list to show new stock level
+        fetchIngredients(); 
 
     } catch (err) {
+       if (err.message !== 'Session expired') {
         toast.error(err.message);
+      }
     }
   };
 
-  // --- (Render Logic is unchanged) ---
+  // ... (Render logic and JSX is unchanged) ...
   if (loading) {
     return (
       <>
@@ -220,7 +212,6 @@ const InventoryPage = () => {
         </div>
       </div>
 
-      {/* --- 4. RENDER BOTH MODALS --- */}
       <IngredientModal
         isOpen={isIngredientModalOpen}
         onClose={handleCloseModals}

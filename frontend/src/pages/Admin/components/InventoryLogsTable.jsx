@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../../context/AuthContext'; 
+import apiClient from '../../../utils/apiClient'; // <-- 1. IMPORT
 
 const InventoryLogsTable = () => {
   const [logs, setLogs] = useState([]);
@@ -12,19 +13,18 @@ const InventoryLogsTable = () => {
     const fetchLogs = async () => {
       setLoading(true);
       try {
-        const response = await fetch('http://localhost:3000/api/inventory/logs', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        // --- 2. USE apiClient ---
+        const response = await apiClient('/inventory/logs'); // No headers
         if (!response.ok) {
           throw new Error('Failed to fetch inventory logs.');
         }
         const data = await response.json();
         setLogs(data);
       } catch (err) {
-        setError(err.message);
-        toast.error(err.message);
+         if (err.message !== 'Session expired') {
+          setError(err.message);
+          toast.error(err.message);
+        }
       } finally {
         setLoading(false);
       }
@@ -35,45 +35,42 @@ const InventoryLogsTable = () => {
     }
   }, [token]);
 
-  // --- STYLING (to avoid Tailwind issues) ---
+  // ... (All styling and JSX is unchanged) ...
   const tableStyle = {
     minWidth: '100%',
-    lineHeight: 'normal', // from leading-normal
+    lineHeight: 'normal',
     backgroundColor: 'white',
     boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-    borderRadius: '0.5rem', // rounded-lg
+    borderRadius: '0.5rem',
     overflow: 'hidden',
   };
-  
   const thStyle = {
     padding: '12px 24px',
     textAlign: 'left',
-    backgroundColor: '#F3F4F6', // gray-100
-    color: '#4B5563', // gray-600
+    backgroundColor: '#F3F4F6',
+    color: '#4B5563',
     textTransform: 'uppercase',
-    fontSize: '0.875rem', // text-sm
+    fontSize: '0.875rem',
     lineHeight: '1.25rem',
   };
-  
   const tdStyle = {
     padding: '12px 24px',
-    fontSize: '0.875rem', // text-sm
-    color: '#374151', // gray-600
-    borderBottom: '1px solid #E5E7EB', // border-b border-gray-200
+    fontSize: '0.875rem',
+    color: '#374151',
+    borderBottom: '1px solid #E5E7EB',
   };
-
   const getActionStyle = (action) => {
-    let color = '#374151'; // Default text
+    let color = '#374151';
     let fontWeight = 'normal';
     
     if (action.includes('ADD') || action.includes('RESTOCK')) {
-      color = '#059669'; // green-700
+      color = '#059669';
       fontWeight = '600';
     } else if (action.includes('SUBTRACT') || action.includes('WASTE')) {
-      color = '#DC2626'; // red-600
+      color = '#DC2626';
       fontWeight = '600';
     } else if (action.includes('INITIAL')) {
-      color = '#4B5563'; // gray-600
+      color = '#4B5563';
       fontWeight = '600';
     }
     
@@ -83,22 +80,20 @@ const InventoryLogsTable = () => {
       textTransform: 'capitalize',
       padding: '4px 8px',
       borderRadius: '9999px',
-      fontSize: '0.75rem', // text-xs
+      fontSize: '0.75rem',
       backgroundColor: {
-        'ADD': '#D1FAE5', // green-100
+        'ADD': '#D1FAE5',
         'RESTOCK': '#D1FAE5',
-        'SUBTRACT': '#FEE2E2', // red-100
+        'SUBTRACT': '#FEE2E2',
         'WASTE': '#FEE2E2',
-        'INITIAL': '#F3F4F6' // gray-100
+        'INITIAL': '#F3F4F6'
       }[action] || '#F3F4F6',
     };
   };
 
-  // --- RENDER LOGIC ---
   if (loading) {
     return <div style={{ padding: '32px', textAlign: 'center' }}>Loading inventory logs...</div>;
   }
-
   if (error) {
     return <div style={{ padding: '32px', textAlign: 'center', color: 'red' }}>Error: {error}</div>;
   }
