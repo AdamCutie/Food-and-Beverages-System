@@ -1,30 +1,42 @@
 import React from 'react';
-import { CheckCircle, Printer, Mail } from 'lucide-react'; // Icons for visual flair
+import { CheckCircle, Printer, Mail } from 'lucide-react';
 
 const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
   if (!isOpen || !orderDetails) return null;
 
-  // Destructure details for easier access
+  // --- THIS IS THE FIX ---
+  // Destructure the new backend-provided financial data
   const {
     order_id,
-    order_date, // Assuming this comes from the backend order creation response
+    order_date,
     order_type,
     delivery_location,
-    items, // The cartItems array passed at the time of order
+    items,
     total_amount, // The final grand total paid
-    payment_method // The simulated method selected
+    payment_method,
+    
+    // Use the secure values from the backend
+    items_total, 
+    service_charge_amount,
+    vat_amount
   } = orderDetails;
 
-  // Recalculate billing summary components (could also be passed in orderDetails if available)
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const serviceChargeRate = 0.10;
-  const vatRate = 0.12;
-  const serviceCharge = subtotal * serviceChargeRate;
-  const vatAmount = (subtotal + serviceCharge) * vatRate;
-  // const grandTotal = subtotal + serviceCharge + vatAmount; // Should match total_amount
+  // We no longer need to recalculate these.
+  // We can derive the rates for display if needed, but it's safer to use the direct values.
+  const subtotal = parseFloat(items_total || 0);
+  const serviceCharge = parseFloat(service_charge_amount || 0);
+  const vatAmount = parseFloat(vat_amount || 0);
+  
+  // Calculate service rate for display (e.g., "10%")
+  // Handle division by zero if subtotal is 0
+  const serviceChargeRate = subtotal > 0 ? (serviceCharge / subtotal) * 100 : 0;
+  // Calculate VAT rate for display
+  const vatRate = (subtotal + serviceCharge) > 0 ? (vatAmount / (subtotal + serviceCharge)) * 100 : 0;
+  
+  // --- END OF FIX ---
 
-  // Placeholder for loyalty points - you'd calculate this based on your rules
-  const loyaltyPointsEarned = Math.floor(total_amount / 10); // Example: 1 point per 10 PHP
+  // Placeholder for loyalty points
+  const loyaltyPointsEarned = Math.floor(total_amount / 10); 
 
   // Format date nicely
   const formattedDate = new Date(order_date || Date.now()).toLocaleString('en-US', {
@@ -36,7 +48,6 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
     hour12: true
   });
 
-  // Placeholder for Receipt No - could be same as order_id or generated separately
   const receiptNo = `OR-${String(order_id).padStart(6, '0')}`;
 
   return (
@@ -52,8 +63,6 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
 
         {/* Hotel/Brand Info (Optional) */}
         <div className="text-center mb-5 border-b pb-4">
-           {/* You can add your logo here if you have it */}
-           {/* <img src="/path/to/your/logo.png" alt="Hotel Logo" className="h-10 mx-auto mb-1"/> */}
            <h3 className="font-bold text-gray-700">THE CELESTIA HOTEL</h3>
            <p className="text-xs text-gray-500">VAT Reg TIN: 123-456-789-000</p>
         </div>
@@ -69,8 +78,6 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
             <span>Date / Time:</span>
             <span className="font-medium">{formattedDate}</span>
           </div>
-          {/* Add Guest Name here if you fetch it based on customer_id */}
-          {/* <div className="flex justify-between"><span>Guest Name:</span><span className="font-medium">{guestName}</span></div> */}
           <div className="flex justify-between">
             <span>Order Type:</span>
             <span className="font-medium">{order_type} {delivery_location ? `(${delivery_location})` : ''}</span>
@@ -94,18 +101,19 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
           </div>
         </div>
 
-        {/* Billing Summary */}
+        {/* --- 3. UPDATED BILLING SUMMARY --- */}
+        {/* This now displays the accurate, backend-provided values */}
         <div className="border-t pt-4 space-y-2 text-sm text-gray-700">
            <div className="flex justify-between">
-              <span>Subtotal:</span>
+              <span>Subtotal (Items Total):</span>
               <span>₱{subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Service Charge ({serviceChargeRate * 100}%):</span>
+              <span>Service Charge ({serviceChargeRate.toFixed(0)}%):</span>
               <span>₱{serviceCharge.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span>VAT ({vatRate * 100}%):</span>
+              <span>VAT ({vatRate.toFixed(0)}%):</span>
               <span>₱{vatAmount.toFixed(2)}</span>
             </div>
             <div className="flex justify-between font-bold text-lg text-black pt-2 border-t mt-2">
@@ -117,6 +125,8 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
               <span>+{loyaltyPointsEarned} points</span>
             </div>
         </div>
+        {/* --- END OF UPDATED BILLING --- */}
+
 
          {/* Email/Print Note */}
          <div className="text-center mt-5 text-xs text-gray-500 bg-gray-50 p-3 rounded-md">
@@ -136,7 +146,6 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
           </button>
         </div>
 
-        {/* Optional Close X Button */}
          <button
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl"

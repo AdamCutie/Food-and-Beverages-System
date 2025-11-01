@@ -10,16 +10,16 @@ import ImageModal from './components/ImageModal';
 import PaymentModal from './components/PaymentModal';
 import ReceiptModal from './components/ReceiptModal';
 import toast from 'react-hot-toast';
-import apiClient from '../../utils/apiClient'; // <-- This should be here
+import apiClient from '../../utils/apiClient'; // This should be here from our previous step
 
 const primaryColor = { backgroundColor: '#0B3D2E' };
 
 function MenuPage() {
   const [items, setItems] = useState([]);
-  const [categories, setCategories] = useState([]); // <-- 1. ADD STATE FOR CATEGORIES
+  const [categories, setCategories] = useState([]);
   const [error, setError] = useState(null);
   const [cartItems, setCartItems] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(0); // <-- 2. CHANGE TO ID (0 = "All")
+  const [selectedCategory, setSelectedCategory] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -30,21 +30,18 @@ function MenuPage() {
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [pendingOrderTotal, setPendingOrderTotal] = useState(0);
+  const [pendingOrderTotal, setPendingOrderTotal] = useState(0); // We still use this for display
   const [receiptDetails, setReceiptDetails] = useState(null);
 
   const { user, token, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-  // --- 3. REMOVE OLD CATEGORY LOGIC ---
-  // const categories = ['All', ...new Set(items.map(item => item.category))];
 
   useEffect(() => { setDeliveryLocation(''); }, [orderType]);
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        // --- 4. FETCH ITEMS AND CATEGORIES ---
         const [itemsResponse, categoriesResponse] = await Promise.all([
           apiClient('/items'),
           apiClient('/categories')
@@ -57,7 +54,7 @@ function MenuPage() {
         const categoriesData = await categoriesResponse.json();
         
         setItems(itemsData);
-        setCategories(categoriesData); // <-- 5. SET CATEGORIES
+        setCategories(categoriesData);
 
       } catch (err) {
         setError(err.message);
@@ -69,9 +66,7 @@ function MenuPage() {
 
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
   const toggleCart = () => setIsCartOpen(!isCartOpen);
-  const handleSelectCategory = (category) => setSelectedCategory(category); // <-- This will now receive an ID
-
-  // ... (Add, Remove, Update cart handlers are unchanged) ...
+  const handleSelectCategory = (category) => setSelectedCategory(category);
   const handleAddToCart = (clickedItem) => {
     setCartItems(prevItems => {
       const isItemInCart = prevItems.find(item => item.item_id === clickedItem.item_id);
@@ -85,9 +80,11 @@ function MenuPage() {
       return [...prevItems, { ...clickedItem, quantity: 1 }];
     });
   };
+
   const handleRemoveItem = (itemIdToRemove) => {
     setCartItems(prevItems => prevItems.filter(item => item.item_id !== itemIdToRemove));
   };
+
   const handleUpdateQuantity = (itemId, newQuantity) => {
     if (newQuantity <= 0) {
       handleRemoveItem(itemId);
@@ -99,7 +96,11 @@ function MenuPage() {
       );
     }
   };
-  const handleProceedToPayment = (grandTotal) => {
+
+  // --- 1. THIS IS THE FIX ---
+  // We no longer pass the total. We just open the modal.
+  // We still calculate the total here *for display* in the PaymentModal.
+  const handleProceedToPayment = () => {
     if (!isAuthenticated) {
       toast.error("You must be logged in to place an order.");
       navigate('/login');
@@ -109,18 +110,29 @@ function MenuPage() {
       toast.error("Please add items and enter table/room number first.");
       return;
     }
-    setPendingOrderTotal(grandTotal);
+    
+    // Calculate total for display
+    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const serviceCharge = subtotal * 0.10;
+    const vatAmount = (subtotal + serviceCharge) * 0.12;
+    const grandTotal = subtotal + serviceCharge + vatAmount;
+
+    setPendingOrderTotal(grandTotal); // Set for display
     setIsPaymentModalOpen(true);
     setIsCartOpen(false);
   };
-  const handleConfirmPayment = async (totalAmount, paymentInfo) => {
-    // ... (This function is unchanged, it still uses apiClient) ...
+  // --- END OF FIX 1 ---
+
+  // --- 2. THIS IS THE FIX ---
+  // `totalAmount` argument is removed.
+  const handleConfirmPayment = async (paymentInfo) => {
     setIsPaymentModalOpen(false);
     setIsPlacingOrder(true);
     toast.loading('Placing your order...');
+
     const orderData = {
       customer_id: user.id,
-      total_price: totalAmount,
+      // 'total_price' is removed. Backend will calculate.
       order_type: orderType,
       instructions: instructions,
       delivery_location: deliveryLocation,
@@ -130,26 +142,39 @@ function MenuPage() {
         price: item.price
       }))
     };
+    // --- END OF FIX 2 ---
+
     try {
+      // Step 1: Create the order. Backend calculates total.
       const orderResponse = await apiClient('/orders', {
         method: 'POST',
         body: JSON.stringify(orderData)
       });
       const orderResult = await orderResponse.json();
       if (!orderResponse.ok) throw new Error(orderResult.message || 'Failed to create order.');
+
       const newOrderId = orderResult.order_id;
+      // --- 3. THIS IS THE FIX ---
+      // We use the SECURE total returned from the backend for the payment.
       const orderTotal = orderResult.total_amount;
+      // --- END OF FIX 3 ---
+
       toast.dismiss();
       toast.loading('Redirecting to PayMongo checkout...');
+
+      // Step 2: Create PayMongo Checkout Session
       const paymentResponse = await apiClient(`/payments/${newOrderId}/paymongo`, {
         method: 'POST',
         body: JSON.stringify({
-          total_amount: orderTotal,
+          total_amount: orderTotal, // Pass the secure total
           payment_method: paymentInfo.selectedPaymentMethod
         })
       });
+
       const paymentResult = await paymentResponse.json();
       if (!paymentResponse.ok) throw new Error(paymentResult.message || 'Failed to create checkout.');
+
+      // Step 3: Redirect to PayMongo Checkout Page
       if (paymentResult.checkoutUrl) {
         window.location.href = paymentResult.checkoutUrl;
       } else {
@@ -164,15 +189,14 @@ function MenuPage() {
       setIsPlacingOrder(false);
     }
   };
+
   const handleCloseReceipt = () => {
     setIsReceiptModalOpen(false);
     setReceiptDetails(null);
   };
 
-  
-  // --- 6. UPDATE FILTER LOGIC ---
   const filteredItems = items
-    .filter(item => selectedCategory === 0 || item.category_id === selectedCategory) // <-- Use 0 for "All" and category_id
+    .filter(item => selectedCategory === 0 || item.category_id === selectedCategory)
     .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
@@ -186,7 +210,6 @@ function MenuPage() {
 
       <main className="container mx-auto px-4 py-8">
         <PromoBanner />
-        {/* --- 7. PASS THE FETCHED CATEGORIES --- */}
         <CategoryTabs
           categories={categories}
           selectedCategory={selectedCategory}
@@ -199,7 +222,6 @@ function MenuPage() {
         />
       </main>
 
-      {/* ... (Rest of the JSX is unchanged) ... */}
       <CartPanel
         cartItems={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
@@ -215,20 +237,23 @@ function MenuPage() {
         setDeliveryLocation={setDeliveryLocation}
         isPlacingOrder={isPlacingOrder}
       />
+
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
-        totalAmount={pendingOrderTotal}
+        totalAmount={pendingOrderTotal} // Pass display total
         onConfirmPayment={handleConfirmPayment}
         deliveryLocation={deliveryLocation}
         orderType={orderType}
         cartItems={cartItems}
       />
+
       <ReceiptModal
         isOpen={isReceiptModalOpen}
         onClose={handleCloseReceipt}
         orderDetails={receiptDetails}
       />
+
       <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
     </div>
   );

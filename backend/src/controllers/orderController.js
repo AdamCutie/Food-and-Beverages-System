@@ -1,6 +1,11 @@
 import pool from "../config/mysql.js";
-// --- ⭐️ MODIFIED IMPORT ⭐️ ---
+// --- (itemController imports are unchanged) ---
 import { validateStock, adjustStock, logOrderStockChange } from "./itemController.js";
+
+// --- DEFINE CONSTANTS HERE ---
+// By defining rates on the backend, they are secure and easy to update.
+const SERVICE_RATE = 0.10; // 10%
+const VAT_RATE = 0.12;     // 12%
 
 
 // @desc    Create a new order (Deducts stock immediately)
@@ -11,43 +16,71 @@ export const createOrder = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const { customer_id, items, order_type, instructions, total_price, delivery_location } = req.body;
+        // --- 1. 'total_price' is REMOVED from req.body ---
+        // We will calculate it on the backend.
+        const { customer_id, items, order_type, instructions, delivery_location } = req.body;
 
         if (!customer_id || !items || items.length === 0 || !delivery_location) {
             throw new Error("Missing required order information.");
         }
-
-        const total_amount = total_price;
-
-        // 1. Validate stock
-        await validateStock(items, connection);
-
-        // 2. Create Order
-        const orderSql = "INSERT INTO orders (customer_id, total_amount, order_type, delivery_location, status) VALUES (?, ?, ?, ?, 'Pending')";
-        const [orderResult] = await connection.query(orderSql, [customer_id, total_amount, order_type, delivery_location]);
+        
+        // --- 2. Create the initial order record ---
+        // We will update the financial fields in a moment.
+        const orderSql = "INSERT INTO orders (customer_id, order_type, delivery_location, status) VALUES (?, ?, ?, 'Pending')";
+        const [orderResult] = await connection.query(orderSql, [customer_id, order_type, delivery_location]);
         const order_id = orderResult.insertId;
 
-        // 3. Insert order details
+        // --- 3. Validate stock AND calculate totals ---
+        let calculatedItemsTotal = 0; // This is our new 'items_total'
+        
+        await validateStock(items, connection); // Validates stock first
+
         for (const item of items) {
             const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
+            
+            calculatedItemsTotal += subtotal; // Add to the grand subtotal
+            
             const detailSql = "INSERT INTO order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
         }
 
-        // 4. Deduct stock
+        // --- 4. Perform backend-side financial calculations ---
+        const calculatedServiceCharge = calculatedItemsTotal * SERVICE_RATE;
+        // VAT is calculated on subtotal + service charge
+        const calculatedVatAmount = (calculatedItemsTotal + calculatedServiceCharge) * VAT_RATE; 
+        const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
+
+        // --- 5. Update the order with the calculated financial data ---
+        const updateSql = `
+            UPDATE orders 
+            SET 
+                items_total = ?, 
+                service_charge_amount = ?, 
+                vat_amount = ?, 
+                total_amount = ? 
+            WHERE order_id = ?
+        `;
+        await connection.query(updateSql, [
+            calculatedItemsTotal,
+            calculatedServiceCharge,
+            calculatedVatAmount,
+            calculatedTotalAmount,
+            order_id
+        ]);
+
+        // --- 6. Deduct stock and log the change ---
         await adjustStock(items, 'deduct', connection);
-        
-        // --- ⭐️ NEW LOGGING STEP ⭐️ ---
         await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
         console.log(`Ingredient stock deducted and logged for order ${order_id}`);
 
         await connection.commit();
 
-        // 5. Return order_id
+        // --- 7. Return the 'order_id' and the final 'total_amount' ---
+        // The frontend needs this total_amount for the PayMongo request.
         res.status(201).json({
             order_id,
-            total_amount,
+            total_amount: calculatedTotalAmount, // Send the secure, calculated total
             message: "Order created successfully"
         });
 
@@ -60,7 +93,7 @@ export const createOrder = async (req, res) => {
     }
 };
 
-// ... (getOrders and getOrderById remain the same) ...
+// ... (getOrders remains the same) ...
 // @desc    Get all orders
 // @route   GET /api/orders
 // @access  Private
@@ -81,15 +114,18 @@ export const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Fetch order record
-    const [orders] = await pool.query("SELECT * FROM orders WHERE order_id = ?", [id]);
+    // --- 1. Fetch order record (including new financial columns) ---
+    const [orders] = await pool.query(
+        "SELECT *, items_total, service_charge_amount, vat_amount FROM orders WHERE order_id = ?", 
+        [id]
+    );
     if (orders.length === 0) {
       return res.status(404).json({ message: "Order not found" });
     }
     const order = orders[0];
 
     // Fetch ordered items
-        const [items] = await pool.query(
+    const [items] = await pool.query(
     `SELECT mi.item_name, od.quantity, mi.price 
     FROM order_details od 
     JOIN menu_items mi ON od.item_id = mi.item_id 
@@ -101,16 +137,19 @@ export const getOrderById = async (req, res) => {
     const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [id]);
     const payment = payments[0] || {};
 
-    // Build clean response
+    // --- 2. Build clean response with all financial details ---
     res.json({
       order_id: order.order_id,
       order_date: order.order_date,
       order_type: order.order_type,
       delivery_location: order.delivery_location,
-      // --- ⭐️ THIS IS THE FIX ⭐️ ---
-      // We must send `order.total_amount` from the database.
-      // The frontend expects it as the key 'total_price'.
-      total_price: order.total_amount, 
+      
+      // The financial breakdown for the receipt
+      items_total: order.items_total,
+      service_charge_amount: order.service_charge_amount,
+      vat_amount: order.vat_amount,
+      total_price: order.total_amount, // 'total_price' is the key the frontend expects
+      
       status: order.status,
       items,
       payment_method: payment.payment_method || "PayMongo",
@@ -123,6 +162,7 @@ export const getOrderById = async (req, res) => {
 };
 
 
+// ... (updateOrderStatus remains the same) ...
 // @desc    Update order operational status (e.g., Preparing, Served)
 // @route   PUT /api/orders/:id/status
 // @access  Private (Staff/Admin)

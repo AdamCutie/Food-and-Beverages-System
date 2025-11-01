@@ -13,7 +13,7 @@ const secondaryColor = {
 const CartPanel = ({
   cartItems = [],
   onUpdateQuantity,
-  onPlaceOrder, // This function will now receive the grandTotal
+  onPlaceOrder, // This function no longer receives any arguments
   isOpen,
   onClose,
   orderType,
@@ -24,24 +24,26 @@ const CartPanel = ({
   deliveryLocation,
   setDeliveryLocation
 }) => {
-  // --- CALCULATIONS ---
-  const SERVICE_RATE = 0.10; // Example: 10% tax/service charge
-  const VAT_RATE = 0.12; // Example: 12% VAT
+  // --- CALCULATIONS (FOR DISPLAY ONLY) ---
+  // These rates are for display in the cart. The backend has its own secure rates.
+  const SERVICE_RATE = 0.10; 
+  const VAT_RATE = 0.12;     
 
   const subtotal = cartItems.reduce(
     (total, item) => total + parseFloat(item.price) * item.quantity,
     0
   );
-  // Calculate taxes based on the subtotal
   const serviceAmount = subtotal * SERVICE_RATE;
-  const vatAmount = subtotal * VAT_RATE;
+  // --- FIX: Corrected VAT calculation (should be on subtotal + service) ---
+  const vatAmount = (subtotal + serviceAmount) * VAT_RATE;
   const grandTotal = subtotal + serviceAmount + vatAmount;
 
-  // Function to call onPlaceOrder with the calculated grandTotal
+  // --- THIS IS THE FIX ---
+  // We no longer pass the total. The backend calculates it.
   const handlePlaceOrderClick = () => {
-    // We pass only the final grand total, which will be saved as total_amount in the backend
-    onPlaceOrder(grandTotal);
+    onPlaceOrder(); 
   };
+  // --- END OF FIX ---
 
   return (
     <>
@@ -93,7 +95,7 @@ const CartPanel = ({
             </label>
             <input
               id="delivery_location"
-              type="text" // Change back to text if needed, or keep number
+              type="text" 
               value={deliveryLocation}
               onChange={(e) => setDeliveryLocation(e.target.value)}
               className="mt-1 w-full border border-gray-300 rounded-md p-2"
@@ -134,7 +136,7 @@ const CartPanel = ({
               <textarea id="instructions" value={instructions} onChange={(e) => setInstructions(e.target.value)} rows="3" className="mt-1 w-full border border-gray-300 rounded-md p-2" placeholder="e.g. allergies, extra spicy, etc."></textarea>
             </div>
 
-            {/* --- UPDATED FOOTER WITH CHARGES --- */}
+            {/* --- Footer with DISPLAY-ONLY calculations --- */}
             <div className="border-t pt-4 mt-4 space-y-2">
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Subtotal</span>

@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 const PaymentModal = ({
   isOpen,
   onClose,
-  totalAmount,
-  onConfirmPayment, // Function to call when "Confirm Payment" is clicked
+  totalAmount, // This is now just for display
+  onConfirmPayment, // This function no longer expects totalAmount
   deliveryLocation,
   orderType,
   cartItems
@@ -13,7 +13,8 @@ const PaymentModal = ({
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('GCash'); // Default
 
-  // Calculations for Billing Summary display
+  // Calculations for Billing Summary display (FOR DISPLAY ONLY)
+  // The backend will perform its own secure calculation.
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const serviceChargeRate = 0.10; // 10%
   const vatRate = 0.12;           // 12%
@@ -21,10 +22,12 @@ const PaymentModal = ({
   const vatAmount = (subtotal + serviceCharge) * vatRate;
   const grandTotal = subtotal + serviceCharge + vatAmount;
 
+  // --- THIS IS THE FIX ---
   const handleConfirm = () => {
-    // Call the onConfirmPayment function, passing the simulated payment method
-    onConfirmPayment(totalAmount, { selectedPaymentMethod });
+    // We only pass the payment method. The backend calculates the total.
+    onConfirmPayment({ selectedPaymentMethod });
   };
+  // --- END OF FIX ---
 
   return (
     <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4">
@@ -33,8 +36,6 @@ const PaymentModal = ({
         <p className="text-gray-600 text-sm text-center mb-6">
           Please select payment method and confirm
         </p>
-
-        {/* REMOVED Guest Information Section */}
 
         {/* Payment Method */}
         <div className="mb-6">
@@ -51,7 +52,6 @@ const PaymentModal = ({
                   className="form-radio h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                 />
                 <span className="text-sm font-medium text-gray-700">{method}</span>
-                 {/* Descriptions can remain */}
                 {method === 'GCash' && <span className="text-xs text-gray-500">- Mobile wallet payment - instant confirmation</span>}
                 {method === 'Debit Card' && <span className="text-xs text-gray-500">- Visa, Mastercard, BancNet, Megalink</span>}
                 {method === 'Credit Card' && <span className="text-xs text-gray-500">- Visa, Mastercard, JCB, American Express</span>}
@@ -60,7 +60,7 @@ const PaymentModal = ({
           </div>
         </div>
 
-        {/* Billing Summary */}
+        {/* Billing Summary (FOR DISPLAY ONLY) */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-3 text-gray-800">Billing Summary</h3>
           <div className="space-y-2 text-sm text-gray-700">
@@ -82,6 +82,7 @@ const PaymentModal = ({
             </div>
             <div className="flex justify-between font-bold text-lg text-green-700 pt-2 border-t border-gray-200">
               <span>Total Amount Due:</span>
+              {/* We use grandTotal (display) but totalAmount (prop) is also passed just in case */}
               <span>₱{grandTotal.toFixed(2)}</span>
             </div>
           </div>

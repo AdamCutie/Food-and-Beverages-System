@@ -30,9 +30,19 @@ router.get("/:order_id", protect, authorizeRoles("cashier", "admin"), getPayment
 -------------------------- */
 
 // 4️⃣ Create PayMongo Checkout Session
-router.post("/:order_id/paymongo", protect, createPaymongoCheckout);
+// --- THIS IS THE FIX: Added bodyParser.json() middleware ---
+router.post(
+  "/:order_id/paymongo",
+  bodyParser.json(), // <-- ADD THIS LINE
+  protect,
+  createPaymongoCheckout
+);
 
 // 5️⃣ Webhook (PayMongo calls this directly — no auth, must use raw body)
-router.post("/webhook", bodyParser.raw({ type: "application/json" }), handlePaymongoWebhook);
+router.post(
+  "/webhook",
+  bodyParser.raw({ type: "application/json" }),
+  handlePaymongoWebhook
+);
 
 export default router;
