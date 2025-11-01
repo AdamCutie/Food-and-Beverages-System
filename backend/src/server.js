@@ -15,6 +15,7 @@ import orderRoutes from "../src/routes/orderRoutes.js";
 import paymentRoutes from "../src/routes/paymentRoutes.js";
 import adminRoutes from "../src/routes/adminRoutes.js";
 import uploadRoutes from './routes/uploadRoutes.js';
+import inventoryRoutes from "../src/routes/inventoryRoutes.js";
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use("/api/items", itemRoutes);
 
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 app.use('/api/upload', uploadRoutes); // Upload Image route
 const __dirname = path.resolve();

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast'; // <-- IMPORT TOAST
+import toast from 'react-hot-toast';
 import MenuManagementTable from './MenuManagementTable';
 import AddItemModal from './AddItemModal';
-import InternalNavBar from '../../components/InternalNavBar';
+import AdminHeader from '../../components/AdminHeader';
 import StaffManagementTable from './StaffManagementTable';
 import { useAuth } from '../../context/AuthContext';
 import StaffModal from './StaffModal';
+import InventoryLogsTable from './InventoryLogsTable'; // --- 1. ADD THIS IMPORT ---
 
-// Order Management Table Component
+// (The OrderManagementTable component is unchanged)
 const OrderManagementTable = ({ orders }) => (
   <div className="bg-white shadow-md rounded-lg overflow-hidden">
     <h2 className="text-2xl font-bold p-6">Order Management</h2>
@@ -44,7 +45,6 @@ const OrderManagementTable = ({ orders }) => (
                 {order.status}
               </span>
             </td>
-            {/* MOVED Data Cell */}
             <td className="py-3 px-6 text-left">{new Date(order.order_date).toLocaleString()}</td>
           </tr>
         ))}
@@ -59,7 +59,7 @@ function AdminPage() {
   const [staffList, setStaffList] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('orders');
+  const [currentView, setCurrentView] = useState('orders'); // Default view
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
@@ -76,6 +76,7 @@ function AdminPage() {
           'Authorization': `Bearer ${token}`
         };
 
+        // We don't need to fetch logs here, the log component fetches its own data
         const [ordersResponse, itemsResponse, staffResponse] = await Promise.all([
           fetch('http://localhost:3000/api/orders'),
           fetch('http://localhost:3000/api/items'),
@@ -99,37 +100,78 @@ function AdminPage() {
     fetchData();
     }
   }, [token]);
-
   
-
+  // (All handler functions remain unchanged)
+  // ...
   const handleAddNewItem = async (formData) => {
+    // --- THIS IS THE NEW PAYLOAD ---
+    // We must format the ingredients array for the backend
+    const payload = {
+      ...formData,
+      ingredients: formData.ingredients.map(ing => ({
+        ingredient_id: ing.ingredient_id,
+        quantity_consumed: ing.quantity_consumed
+      }))
+    };
+    
+    // The API endpoint is now /api/admin/items
     try {
-      const response = await fetch('http://localhost:3000/api/items', {
+      const response = await fetch('http://localhost:3000/api/admin/items', { // --- FIX: Use admin route ---
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // --- FIX: Add Auth Token ---
+        },
+        body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error('Failed to save the item.');
-      const newItem = await response.json();
-      setMenuItems(prevItems => [...prevItems, newItem]);
-      toast.success('Item added successfully!'); // <-- USE TOAST
-      closeModal(); // <-- THIS FIXES THE BUG
+      if (!response.ok) {
+         const errData = await response.json();
+         throw new Error(errData.message || 'Failed to save the item.');
+      }
+      
+      // Manually refetch items to get the new list with its recipe
+      const itemsResponse = await fetch('http://localhost:3000/api/items');
+      const itemsData = await itemsResponse.json();
+      setMenuItems(itemsData);
+
+      toast.success('Item added successfully!'); 
+      closeModal(); 
     } catch (error) {
-      toast.error(error.message); // <-- Use toast for errors too
+      toast.error(error.message);
     }
   };
 
   const handleUpdateItem = async (itemData) => {
+    // --- THIS IS THE NEW PAYLOAD ---
+    const payload = {
+      ...itemData,
+      ingredients: itemData.ingredients.map(ing => ({
+        ingredient_id: ing.ingredient_id,
+        quantity_consumed: ing.quantity_consumed
+      }))
+    };
+    
+    // The API endpoint is now /api/admin/items/:id
     try {
-      const response = await fetch(`http://localhost:3000/api/items/${editingItem.item_id}`, {
+      const response = await fetch(`http://localhost:3000/api/admin/items/${editingItem.item_id}`, { // --- FIX: Use admin route ---
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(itemData),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // --- FIX: Add Auth Token ---
+        },
+        body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error('Failed to update item.');
-      const updatedItem = await response.json();
-      setMenuItems(prevItems => prevItems.map(item => item.item_id === updatedItem.item_id ? updatedItem : item));
-      toast.success('Item updated successfully!'); // <-- USE TOAST
+      if (!response.ok) {
+         const errData = await response.json();
+         throw new Error(errData.message || 'Failed to update item.');
+      }
+      
+      // Manually refetch items
+      const itemsResponse = await fetch('http://localhost:3000/api/items');
+      const itemsData = await itemsResponse.json();
+      setMenuItems(itemsData);
+
+      toast.success('Item updated successfully!');
       closeModal();
     } catch (error) {
       toast.error(error.message);
@@ -138,13 +180,21 @@ function AdminPage() {
 
   const handleDeleteItem = async (itemIdToDelete) => {
     if (!window.confirm('Are you sure you want to delete this item?')) return;
+    
+    // The API endpoint is now /api/admin/items/:id
     try {
-      const response = await fetch(`http://localhost:3000/api/items/${itemIdToDelete}`, {
+      const response = await fetch(`http://localhost:3000/api/admin/items/${itemIdToDelete}`, { // --- FIX: Use admin route ---
         method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}` // --- FIX: Add Auth Token ---
+        }
       });
-      if (!response.ok) throw new Error('Failed to delete the item.');
+      if (!response.ok) {
+         const errData = await response.json();
+         throw new Error(errData.message || 'Failed to delete the item.');
+      }
       setMenuItems(prevItems => prevItems.filter(item => item.item_id !== itemIdToDelete));
-      toast.success('Item deleted successfully!'); // <-- USE TOAST
+      toast.success('Item deleted successfully!');
     } catch (error) {
       toast.error(error.message);
     }
@@ -169,7 +219,7 @@ const openModalForEdit = (item) => {
     setMenuFilterCategory(category);
   };
 
-  const handleClearMenuFilters = () => {
+  const handleClearFilters = () => {
     setMenuFilterCategory('All');
   };
 
@@ -187,8 +237,7 @@ const openModalForEdit = (item) => {
         const errData = await response.json();
         throw new Error(errData.message || 'Failed to save the staff member.');
       }
-      const newStaff = await response.json(); // The backend returns { staff_id, message }
-      // Refetch the list to get the full new staff details
+      const newStaff = await response.json(); 
       const listResponse = await fetch('http://localhost:3000/api/admin/staff', { 
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -203,7 +252,6 @@ const openModalForEdit = (item) => {
   };
 
   const handleUpdateStaff = async (formData) => {
-    // Don't send an empty password field
     const payload = { ...formData };
     if (!payload.password) {
       delete payload.password;
@@ -223,7 +271,6 @@ const openModalForEdit = (item) => {
         throw new Error(errData.message || 'Failed to update staff member.');
       }
       
-      // Refetch the list to get updated details
       const listResponse = await fetch('http://localhost:3000/api/admin/staff', { 
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -257,8 +304,6 @@ const openModalForEdit = (item) => {
     }
   };
 
-  // --- 11. ADD MODAL HANDLERS FOR STAFF ---
-
   const openStaffModalForEdit = (staff) => {
     setEditingStaff(staff);
     setIsStaffModalOpen(true);
@@ -273,14 +318,15 @@ const openModalForEdit = (item) => {
     setIsStaffModalOpen(false);
     setEditingStaff(null);
   };
+   // --- End of handler functions ---
 
-  // ... (loading/error checks)
+
   if (loading) return <div className="p-8">Loading dashboard...</div>;
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;
   
   const uniqueCategories = ['All', ...new Set(menuItems.map(item => item.category))];
   const allCategories = ['All', ...new Set(menuItems.map(item => item.category))];
-  const categoriesForForm = allCategories.filter(c => c !== 'All'); // Exclude 'All' for the Add/Edit form
+  const categoriesForForm = allCategories.filter(c => c !== 'All');
 
   const filteredMenuItems = menuItems.filter(item => 
     menuFilterCategory === 'All' || item.category === menuFilterCategory
@@ -288,92 +334,99 @@ const openModalForEdit = (item) => {
 
    return (
     <>
-    <InternalNavBar />
-    <div className="container mx-auto px-4 py-8">
+      <AdminHeader />
+      <div className="container mx-auto px-4 py-8">
       
-      {/* --- THIS IS THE CORRECTED NAVIGATION SECTION --- */}
-      <nav className="flex space-x-4 border-b mb-8">
-        <button
-          onClick={() => setCurrentView('orders')}
-          className={`py-2 px-4 text-lg font-semibold transition-colors ${
-            currentView === 'orders'
-              ? 'border-b-2 border-orange-500 text-orange-500'
-              : 'text-gray-500 hover:text-orange-500'
-          }`}
-        >
-          Order Management
-        </button>
-        <button
-          onClick={() => setCurrentView('menu')}
-          className={`py-2 px-4 text-lg font-semibold transition-colors ${
-            currentView === 'menu'
-              ? 'border-b-2 border-orange-500 text-orange-500'
-              : 'text-gray-500 hover:text-orange-500'
-          }`}
-        >
-          Menu Management
-        </button>
+        <nav className="flex space-x-4 border-b mb-8">
+          <button
+            onClick={() => setCurrentView('orders')}
+            className={`py-2 px-4 text-lg font-semibold transition-colors ${
+              currentView === 'orders'
+                ? 'border-b-2 border-orange-500 text-orange-500'
+                : 'text-gray-500 hover:text-orange-500'
+            }`}
+          >
+            Order Management
+          </button>
+          <button
+            onClick={() => setCurrentView('menu')}
+            className={`py-2 px-4 text-lg font-semibold transition-colors ${
+              currentView === 'menu'
+                ? 'border-b-2 border-orange-500 text-orange-500'
+                : 'text-gray-500 hover:text-orange-500'
+            }`}
+          >
+            Menu Management
+          </button>
+          <button
+            onClick={() => setCurrentView('staff')}
+            className={`py-2 px-4 text-lg font-semibold transition-colors ${
+              currentView === 'staff'
+                ? 'border-b-2 border-orange-500 text-orange-500'
+                : 'text-gray-500 hover:text-orange-500'
+            }`}
+          >
+            Staff Management
+          </button>
 
-        {/* --- ADD STAFF MANAGEMENT TAB --- */}
-        <button
-          onClick={() => setCurrentView('staff')}
-          className={`py-2 px-4 text-lg font-semibold transition-colors ${
-            currentView === 'staff'
-              ? 'border-b-2 border-orange-500 text-orange-500'
-              : 'text-gray-500 hover:text-orange-500'
-          }`}
-        >
-          Staff Management
-        </button>
-      </nav>
+          {/* --- 2. ADD THE "INVENTORY LOGS" TAB --- */}
+          <button
+            onClick={() => setCurrentView('logs')}
+            className={`py-2 px-4 text-lg font-semibold transition-colors ${
+              currentView === 'logs'
+                ? 'border-b-2 border-orange-500 text-orange-500'
+                : 'text-gray-500 hover:text-orange-500'
+            }`}
+          >
+            Inventory Logs
+          </button>
 
-      <main>
-        {currentView === 'orders' && <OrderManagementTable orders={orders} />}
-        {currentView === 'menu' && (
-          <MenuManagementTable
-            // Pass the filtered list and total count
-            items={filteredMenuItems} 
-            totalItems={filteredMenuItems.length} 
-            // Pass categories for the filter dropdown
-            categories={allCategories} 
-            selectedCategory={menuFilterCategory}
-            onFilterChange={handleMenuFilterChange}
-            onClearFilters={handleClearMenuFilters}
-            // Pass modal handlers
-            onAddItem={openModalForAdd}
-            onEditItem={openModalForEdit}
-            onDeleteItem={handleDeleteItem}
-          />
-        )}
+        </nav>
 
-        {/* --- 13. RENDER THE STAFF TABLE --- */}
-        {currentView === 'staff' && (
-          <StaffManagementTable
-            staffList={staffList}
-            onAddStaff={openStaffModalForAdd}
-            onEditStaff={openStaffModalForEdit}
-            onDeleteStaff={handleDeleteStaff}
-          />
-        )}
+        <main>
+          {currentView === 'orders' && <OrderManagementTable orders={orders} />}
+          {currentView === 'menu' && (
+            <MenuManagementTable
+              items={filteredMenuItems} 
+              totalItems={filteredMenuItems.length} 
+              categories={allCategories} 
+              selectedCategory={menuFilterCategory}
+              onFilterChange={handleMenuFilterChange}
+              onClearFilters={handleClearFilters}
+              onAddItem={openModalForAdd}
+              onEditItem={openModalForEdit}
+              onDeleteItem={handleDeleteItem}
+            />
+          )}
+          {currentView === 'staff' && (
+            <StaffManagementTable
+              staffList={staffList}
+              onAddStaff={openStaffModalForAdd}
+              onEditStaff={openStaffModalForEdit}
+              onDeleteStaff={handleDeleteStaff}
+            />
+          )}
+          
+          {/* --- 3. RENDER THE NEW COMPONENT --- */}
+          {currentView === 'logs' && <InventoryLogsTable />}
 
-      </main>
-      {/* --- FIX: Render the AddItemModal here --- */}
-      <AddItemModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        onSave={editingItem ? handleUpdateItem : handleAddNewItem}
-        itemToEdit={editingItem}
-        categories={uniqueCategories.filter(c => c !== 'All')}
-      />
+        </main>
+        
+        <AddItemModal
+          isOpen={isModalOpen}
+          onClose={closeModal}
+          onSave={editingItem ? handleUpdateItem : handleAddNewItem}
+          itemToEdit={editingItem}
+          categories={uniqueCategories.filter(c => c !== 'All')}
+        />
 
-      {/* --- 14. RENDER THE NEW STAFF MODAL --- */}
-      <StaffModal
-        isOpen={isStaffModalOpen}
-        onClose={closeStaffModal}
-        onSave={editingStaff ? handleUpdateStaff : handleAddStaff}
-        staffToEdit={editingStaff}
-      />
-    </div>
+        <StaffModal
+          isOpen={isStaffModalOpen}
+          onClose={closeStaffModal}
+          onSave={editingStaff ? handleUpdateStaff : handleAddStaff}
+          staffToEdit={editingStaff}
+        />
+      </div>
     </>
   );
 }

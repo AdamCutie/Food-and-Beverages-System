@@ -1,6 +1,6 @@
 import pool from "../config/mysql.js";
-// --- MODIFIED: Import adjustStock ---
-import { validateStock, adjustStock } from "./itemController.js";
+// --- ⭐️ MODIFIED IMPORT ⭐️ ---
+import { validateStock, adjustStock, logOrderStockChange } from "./itemController.js";
 
 
 // @desc    Create a new order (Deducts stock immediately)
@@ -19,30 +19,32 @@ export const createOrder = async (req, res) => {
 
         const total_amount = total_price;
 
-        // --- 1. Validate stock ---
+        // 1. Validate stock
         await validateStock(items, connection);
 
-        // --- 2. Create Order with 'Pending' status ---
+        // 2. Create Order
         const orderSql = "INSERT INTO orders (customer_id, total_amount, order_type, delivery_location, status) VALUES (?, ?, ?, ?, 'Pending')";
         const [orderResult] = await connection.query(orderSql, [customer_id, total_amount, order_type, delivery_location]);
         const order_id = orderResult.insertId;
 
-        // --- 3. Insert order details ---
+        // 3. Insert order details
         for (const item of items) {
             const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
-
             const detailSql = "INSERT INTO order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
         }
 
-        // --- 4. Deduct stock immediately ---
+        // 4. Deduct stock
         await adjustStock(items, 'deduct', connection);
-        console.log(`Stock deducted for order ${order_id}`);
+        
+        // --- ⭐️ NEW LOGGING STEP ⭐️ ---
+        await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
+        console.log(`Ingredient stock deducted and logged for order ${order_id}`);
 
         await connection.commit();
 
-        // --- 5. Return order_id and total_amount for the next step ---
+        // 5. Return order_id
         res.status(201).json({
             order_id,
             total_amount,
@@ -58,14 +60,12 @@ export const createOrder = async (req, res) => {
     }
 };
 
-// --- REMOVED finalizeOrderAfterPayment function ---
-
+// ... (getOrders and getOrderById remain the same) ...
 // @desc    Get all orders
 // @route   GET /api/orders
 // @access  Private
 export const getOrders = async (req, res) => {
     try {
-        // Simple query, no need to join payments for status here
         const [orders] = await pool.query('SELECT * FROM orders ORDER BY order_date DESC');
         res.json(orders);
     } catch (error) {
@@ -81,15 +81,13 @@ export const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Fetch order record
     const [orders] = await pool.query("SELECT * FROM orders WHERE order_id = ?", [id]);
     if (orders.length === 0) {
       return res.status(404).json({ message: "Order not found" });
     }
     const order = orders[0];
 
-    // Fetch ordered items
-        const [items] = await pool.query(
+    const [items] = await pool.query(
     `SELECT mi.item_name, od.quantity, mi.price 
     FROM order_details od 
     JOIN menu_items mi ON od.item_id = mi.item_id 
@@ -97,20 +95,17 @@ export const getOrderById = async (req, res) => {
     [id]
     );
 
-
-    // Fetch payment info
     const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [id]);
     const payment = payments[0] || {};
 
-    // Build clean response
     res.json({
       order_id: order.order_id,
       order_date: order.order_date,
       order_type: order.order_type,
       delivery_location: order.delivery_location,
-      total_price: order.total_price,
+      total_price: order.total_amount, 
       status: order.status,
-      items,                              // for ReceiptModal
+      items,
       payment_method: payment.payment_method || "PayMongo",
       payment_status: payment.payment_status || "paid",
     });
@@ -126,26 +121,26 @@ export const getOrderById = async (req, res) => {
 // @access  Private (Staff/Admin)
 export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body; // Expecting 'Preparing', 'Ready', 'Served', 'Cancelled' etc.
+    const { status } = req.body; 
     const connection = await pool.getConnection();
 
     try {
         await connection.beginTransaction();
 
-        // --- Simplified Cancellation: Restore stock ONLY IF order was NOT already marked 'paid' in payments table ---
         if (status.toLowerCase() === 'cancelled') {
-             // Check if a 'paid' payment record exists
-            const [payments] = await connection.query("SELECT * FROM payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
+             const [payments] = await connection.query("SELECT * FROM payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
 
             if (payments.length > 0) {
-                 console.warn(`Order ${id} was already paid. Cancellation requested, but stock NOT restored automatically. Manual adjustment/refund likely needed.`);
-                 // Decide if you want to prevent cancellation of paid orders entirely:
-                 // await connection.rollback();
-                 // return res.status(400).json({ message: "Cannot cancel an order that has already been paid." });
+                 console.warn(`Order ${id} was already paid. Cancellation requested, but stock NOT restored automatically.`);
             } else {
-                 console.log(`Restoring stock for cancelled unpaid order: ${id}`);
+                 console.log(`Restoring ingredient stock for cancelled unpaid order: ${id}`);
                  const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
+                 
+                 // Restore stock
                  await adjustStock(details, 'restore', connection);
+                 
+                 // --- ⭐️ NEW LOGGING STEP ⭐️ ---
+                 await logOrderStockChange(id, details, 'ORDER_RESTORE', connection);
             }
         }
 
@@ -166,13 +161,12 @@ export const updateOrderStatus = async (req, res) => {
 };
 
 
+// ... (getKitchenOrders and getServedOrders remain the same) ...
 // @desc    Get orders for the kitchen
 // @route   GET /api/orders/kitchen
 // @access  Private (Staff)
 export const getKitchenOrders = async (req, res) => {
     try {
-        // --- SIMPLIFIED: Show orders in the kitchen pipeline regardless of payment ---
-        // (Because stock is already deducted)
         const sql = `
             SELECT o.*, c.first_name, c.last_name
             FROM orders o
@@ -196,7 +190,6 @@ export const getKitchenOrders = async (req, res) => {
 // @access  Private (Staff)
 export const getServedOrders = async (req, res) => {
     try {
-        // This remains the same
         const sql = `
             SELECT o.*, c.first_name, c.last_name
             FROM orders o

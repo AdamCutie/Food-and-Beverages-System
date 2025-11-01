@@ -11,9 +11,11 @@ import LoginPage from './pages/Auth/LoginPage';
 import RegisterPage from './pages/Auth/RegisterPage';
 import NotAuthorizedPage from './pages/Auth/NotAuthorizedPage';
 
-// ✅ Add these new imports
 import PaymentSuccess from './pages/Customer/PaymentSuccess.jsx';
 import PaymentCancel from './pages/Customer/PaymentCancel.jsx';
+
+// --- NEW: Import the page we are about to create ---
+import InventoryPage from './pages/Kitchen/InventoryPage.jsx';
 
 // Import Route Handlers
 import ProtectedRoute from './components/routing/ProtectedRoute';
@@ -68,6 +70,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+        
+        {/* --- NEW: Add the Inventory Page Route --- */}
+        <Route
+          path="/kitchen/inventory"
+          element={
+            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier']}>
+              <InventoryPage />
+            </ProtectedRoute>
+          }
+        />
+        
         <Route
           path="/kitchen/archive"
           element={
@@ -77,7 +90,7 @@ function App() {
           }
         />
 
-        {/* ✅ Public PayMongo Redirect Pages (no protection) */}
+        {/* Public PayMongo Redirect Pages (no protection) */}
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/payment-cancel" element={<PaymentCancel />} />
 

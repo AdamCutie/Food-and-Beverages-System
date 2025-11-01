@@ -1,58 +1,75 @@
 import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import ProfileDropdown from './ProfileDropdown';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext'; // We still need this for the profile
 
 const InternalNavBar = () => {
-  const { user } = useAuth();
+  // Basic styling for the nav link items
+  const navLinkStyle = {
+    color: 'white',
+    textDecoration: 'none',
+    padding: '8px 12px',
+    borderRadius: '4px',
+    fontWeight: 'bold',
+    fontSize: '18px', // text-lg
+  };
+
+  // Style for the active nav link
+  const activeNavLinkStyle = {
+    ...navLinkStyle,
+    color: '#F9A825', // Accent color for active link
+  };
 
   return (
-    <nav className="bg-primary text-white flex items-center justify-between px-6 py-2 shadow-md sticky top-0 z-10">
+    <nav style={{
+        backgroundColor: '#3C2A21', // Dark brown background
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '10px 24px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+    }}>
       {/* Left: Logo and Title */}
-      <div className="flex items-center gap-4">
-        <Link to={user.role === 'admin' ? '/admin' : '/kitchen'}>
-          <img src="/images/logo_var.svg" alt="Logo" className="h-16" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <Link to="/kitchen">
+          <img src="/images/logo_var.svg" alt="Logo" style={{ height: '64px' }} />
         </Link>
-        <h1 className="text-xl font-bold">
-          {user.role === 'admin' ? 'Admin Dashboard' : 'Kitchen Display'}
+        <h1 style={{ fontSize: '20px', fontWeight: 'bold' }}>
+          Staff Portal
         </h1>
       </div>
 
-      {/* Center: Navigation Links */}
-      <div className="flex items-center gap-6">
-        {/* Admin-only link */}
-        {user.role === 'admin' && (
-          <NavLink
-            to="/admin"
-            className={({ isActive }) =>
-              `text-lg font-medium hover:text-accent ${isActive ? 'text-accent' : 'text-white'}`
-            }
-          >
-            Dashboard
-          </NavLink>
-        )}
-        
-        {/* Staff/Admin links */}
+      {/* Center: Navigation Links (Kitchen ONLY) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
         <NavLink
           to="/kitchen"
-          className={({ isActive }) =>
-            `text-lg font-medium hover:text-accent ${isActive ? 'text-accent' : 'text-white'}`
-          }
+          end
+          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
         >
           Kitchen
         </NavLink>
+        
+        <NavLink
+          to="/kitchen/inventory"
+          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
+        >
+          Inventory
+        </NavLink>
+
         <NavLink
           to="/kitchen/archive"
-          className={({ isActive }) =>
-            `text-lg font-medium hover:text-accent ${isActive ? 'text-accent' : 'text-white'}`
-          }
+          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
         >
           Archive
         </NavLink>
       </div>
 
       {/* Right: Profile Dropdown */}
-      <div className="justify-self-end">
+      <div>
         <ProfileDropdown />
       </div>
     </nav>
