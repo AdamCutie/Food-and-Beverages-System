@@ -88,10 +88,10 @@ CREATE TABLE `inventory_logs` (
 --
 
 INSERT INTO `inventory_logs` (`log_id`, `ingredient_id`, `staff_id`, `action_type`, `quantity_change`, `new_stock_level`, `reason`, `timestamp`) VALUES
-(1, 1, 3, 'INITIAL', 5000.00, 5000.00, 'Ingredient created', '2025-11-01 03:45:10'),
-(2, 1, NULL, 'ORDER_DEDUCT', 150.00, 4850.00, 'Order ID: 1', '2025-11-01 04:13:09'),
-(3, 1, NULL, 'ORDER_DEDUCT', 300.00, 4550.00, 'Order ID: 2', '2025-11-01 04:18:34'),
-(4, 1, NULL, 'ORDER_DEDUCT', 450.00, 4100.00, 'Order ID: 3', '2025-11-01 04:30:23');
+(11, 1, 3, 'INITIAL', 5000.00, 5000.00, 'Ingredient created', '2025-11-01 03:45:10'),
+(12, 1, NULL, 'ORDER_DEDUCT', 150.00, 4850.00, 'Order ID: 1', '2025-11-01 04:13:09'),
+(13, 1, NULL, 'ORDER_DEDUCT', 300.00, 4550.00, 'Order ID: 2', '2025-11-01 04:18:34'),
+(14, 1, NULL, 'ORDER_DEDUCT', 450.00, 4100.00, 'Order ID: 3', '2025-11-01 04:30:23');
 
 -- --------------------------------------------------------
 
@@ -375,7 +375,7 @@ ALTER TABLE `inventory_logs`
 -- Constraints for table `menu_item_ingredients`
 --
 ALTER TABLE `menu_item_ingredients`
-  ADD CONSTRAINT `fk_ingredient` FOREIGN KEY (`ingredient_id`) REFERENCES `ingredients` (`ingredient_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_ingredient` FOREIGN KEY (`ingredient_id`) REFERENCES `ingredients` (`ingredient_id`) ON DELETE RESTRICT,
   ADD CONSTRAINT `fk_menu_item` FOREIGN KEY (`menu_item_id`) REFERENCES `menu_items` (`item_id`) ON DELETE CASCADE;
 
 --
