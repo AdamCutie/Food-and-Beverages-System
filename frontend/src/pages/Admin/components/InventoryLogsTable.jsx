@@ -195,11 +195,11 @@ const InventoryLogsTable = () => {
                   </span>
                 </td>
                 <td style={{
-                  ...tdStyle,
-                  fontWeight: '600',
-                  color: (log.action_type.includes('ADD') || log.action_type.includes('RESTOCK')) ? '#059669' : '#DC2626'
+              ...tdStyle,
+        fontWeight: '600',
+         color: (log.action_type.includes('ADD') || log.action_type.includes('RESTOCK') || log.action_type === 'INITIAL') ? '#059669' : '#DC2626'
                 }}>
-                  {(log.action_type.includes('ADD') || log.action_type.includes('RESTOCK')) ? '+' : '-'}{log.quantity_change}
+             {(log.action_type.includes('ADD') || log.action_type.includes('RESTOCK') || log.action_type === 'INITIAL') ? '+' : '-'}{log.quantity_change}
                 </td>
                 <td style={{ ...tdStyle, fontWeight: '600' }}>{log.new_stock_level}</td>
                 <td style={tdStyle}>{log.reason || 'N/A'}</td>

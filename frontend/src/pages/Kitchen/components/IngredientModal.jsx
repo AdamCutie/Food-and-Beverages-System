@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
 const IngredientModal = ({ isOpen, onClose, onSave, ingredientToEdit }) => {
+
+const unitOptions = [
+    { value: 'g', label: 'g (grams)' },
+    { value: 'ml', label: 'ml (milliliters)' },
+    { value: 'pcs', label: 'pcs (pieces)' },
+  ];
+  
   const [formData, setFormData] = useState({
     name: '',
     unit_of_measurement: '',
@@ -67,19 +74,24 @@ const IngredientModal = ({ isOpen, onClose, onSave, ingredientToEdit }) => {
             />
           </div>
 
-          <div>
+         <div>
             <label htmlFor="unit_of_measurement" className="block text-sm font-medium text-gray-700">
               Unit of Measurement
             </label>
-            <input
-              type="text"
+            <select
               id="unit_of_measurement"
               value={formData.unit_of_measurement}
               onChange={handleChange}
               required
               className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3"
-              placeholder="e.g., g, ml, pcs"
-            />
+            >
+              <option value="" disabled>Select a unit</option>
+              {unitOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {!isEditMode && (
