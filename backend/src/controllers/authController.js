@@ -77,7 +77,11 @@ export const loginUser = async (req, res) => {
     let payload = {}; 
 
     // First, check if the email belongs to a customer
-    const [customer] = await pool.query("SELECT * FROM customers WHERE email = ?", [email]);
+    // This is more specific
+    const [customer] = await pool.query(
+      "SELECT customer_id, first_name, last_name, email, password FROM customers WHERE email = ?", 
+      [email]
+    );
     if (customer.length > 0) {
       user = customer[0];
       userType = "customer";
