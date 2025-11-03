@@ -192,10 +192,10 @@ function KitchenPage() {
                   <p className="text-sm">Customer: <span className="font-medium">{order.first_name} {order.last_name}</span></p>
                 </div>
 
-                <div className="space-y-2 mb-3 flex-grow overflow-y-auto max-h-48 pr-1">
+                <div className="space-y-2 mb-3 grow overflow-y-auto max-h-48 pr-1">
                   <h3 className="font-semibold">Items:</h3>
-                  {order.details && order.details.length > 0 ? (
-                    order.details.map(item => (
+                  {order.items && order.items.length > 0 ? (
+                    order.items.map(item => (
                       <div key={item.detail_id} className="text-sm ml-2">
                         <span className="font-medium">{item.quantity} x</span> {item.item_name}
                         {item.instructions && <p className="text-xs text-gray-600 italic pl-4">- {item.instructions}</p>}
