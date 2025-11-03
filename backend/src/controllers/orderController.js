@@ -209,7 +209,12 @@ export const getOrderById = async (req, res) => {
     const order = orders[0];
 
     const [items] = await pool.query(
-    `SELECT mi.item_name, od.quantity, mi.price 
+    `SELECT 
+        mi.item_name, 
+        od.quantity, 
+        mi.price,
+        od.instructions,
+        od.order_detail_id AS detail_id /* <-- This is the final fix */
     FROM order_details od 
     JOIN menu_items mi ON od.item_id = mi.item_id 
     WHERE od.order_id = ?`,
