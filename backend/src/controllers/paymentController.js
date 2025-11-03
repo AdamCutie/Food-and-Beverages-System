@@ -186,16 +186,6 @@ export const recordPayment = async (req, res) => {
       payment_amount,
       change_amount || 0,
     ]);
-
-    const [details] = await connection.query(
-      "SELECT item_id, quantity FROM order_details WHERE order_id = ?",
-      [order_id]
-    );
-    for (const item of details) {
-      const stockSql = "UPDATE menu_items SET stock = stock - ? WHERE item_id = ?";
-      await connection.query(stockSql, [item.quantity, item.item_id]);
-    }
-
     await connection.query("UPDATE orders SET status = 'Completed' WHERE order_id = ?", [order_id]);
 
     await connection.commit();
