@@ -6,7 +6,7 @@ import pool from "../config/mysql.js";
 export const getAllItems = async (req, res) => {
     try {
         // --- FIX: JOIN with categories table ---
-        const sql = `
+       const sql = `
             SELECT 
                 mi.item_id, 
                 mi.item_name, 
@@ -14,7 +14,10 @@ export const getAllItems = async (req, res) => {
                 mi.price, 
                 mi.image_url, 
                 mi.description,
-                mi.category_id
+                mi.category_id,
+                mi.is_promo,
+                mi.promo_discount_percentage,
+                mi.promo_expiry_date
             FROM menu_items mi
             LEFT JOIN categories c ON mi.category_id = c.category_id
         `;
@@ -56,7 +59,11 @@ export const getItemById = async (req, res) => {
                 mi.price, 
                 mi.image_url, 
                 mi.description,
-                mi.category_id
+                mi.category_id,
+                mi.is_promo,
+                mi.promo_discount_percentage,
+                mi.promo_expiry_date
+
             FROM menu_items mi
             LEFT JOIN categories c ON mi.category_id = c.category_id
             WHERE mi.item_id = ?
@@ -87,8 +94,11 @@ export const getItemById = async (req, res) => {
 // @route   POST /api/admin/items
 // @access  Admin
 export const createMenuItem = async (req, res) => {
-    // --- FIX: Use category_id ---
-    const { item_name, category_id, price, image_url, description, ingredients } = req.body; 
+
+    const { 
+        item_name, category_id, price, image_url, description, ingredients, 
+        is_promo, promo_discount_percentage, promo_expiry_date
+    } = req.body; 
 
     if (!item_name || !category_id || !price) { 
         return res.status(400).json({ message: 'Please provide item name, category, and price.' });
@@ -103,9 +113,24 @@ export const createMenuItem = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // --- FIX: Insert category_id ---
-        const sql = "INSERT INTO menu_items (item_name, category_id, price, image_url, description) VALUES (?, ?, ?, ?, ?)";
-        const [result] = await connection.query(sql, [item_name, category_id, price, image_url, description]);
+        // --- 2. UPDATE SQL QUERY ---
+        const sql = `
+            INSERT INTO menu_items 
+            (item_name, category_id, price, image_url, description, is_promo, promo_discount_percentage, promo_expiry_date) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        // --- 3. UPDATE SQL PARAMETERS (HANDLE NULLS) ---
+        const [result] = await connection.query(sql, [
+            item_name, 
+            category_id, 
+            price, 
+            image_url, 
+            description,
+            is_promo ? 1 : 0,
+            is_promo ? promo_discount_percentage : null,
+            is_promo ? promo_expiry_date: null
+        ]);
         const newItemId = result.insertId;
 
         const recipeSql = "INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id, quantity_consumed) VALUES ?";
@@ -131,8 +156,11 @@ export const createMenuItem = async (req, res) => {
 // @access  Admin
 export const updateMenuItem = async (req, res) => {
     const { id } = req.params;
-    // --- FIX: Use category_id ---
-    const { item_name, category_id, price, image_url, description, ingredients } = req.body;
+    // --- 1. ADD NEW FIELDS FROM REQ.BODY ---
+    const { 
+        item_name, category_id, price, image_url, description, ingredients,
+        is_promo, promo_discount_percentage, promo_expiry_date
+    } = req.body;
 
     if (!item_name || !category_id || !price) { 
         return res.status(400).json({ message: 'Please provide item name, category, and price.' });
@@ -147,13 +175,26 @@ export const updateMenuItem = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        // --- FIX: Update category_id ---
+        // --- 2. UPDATE SQL QUERY ---
         const sql = `
             UPDATE menu_items 
-            SET item_name = ?, category_id = ?, price = ?, image_url = ?, description = ? 
+            SET item_name = ?, category_id = ?, price = ?, image_url = ?, description = ?,
+                is_promo = ?, promo_discount_percentage = ?, promo_expiry_date= ? 
             WHERE item_id = ?
         `;
-        const [result] = await connection.query(sql, [item_name, category_id, price, image_url, description, id]);
+        
+        // --- 3. UPDATE SQL PARAMETERS (HANDLE NULLS) ---
+        const [result] = await connection.query(sql, [
+            item_name, 
+            category_id, 
+            price, 
+            image_url, 
+            description, 
+            is_promo ? 1 : 0,
+            is_promo ? promo_discount_percentage : null,
+            is_promo ? promo_expiry_date: null,
+            id
+        ]);
 
         if (result.affectedRows === 0) {
             await connection.rollback();

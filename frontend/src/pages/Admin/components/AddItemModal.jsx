@@ -11,10 +11,13 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
   const [formData, setFormData] = useState({
     item_name: '',
     description: '',
-    category_id: '', // <-- 2. CHANGED from 'category'
+    category_id: '', 
     price: '',
     image_url: '',
     ingredients: [],
+    is_promo: false,
+    promo_discount_percentage: '',
+    promo_expiry_date: '',
   });
   const [uploading, setUploading] = useState(false);
   const isEditMode = Boolean(itemToEdit);
@@ -57,7 +60,7 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
             setFormData({
               item_name: data.item_name || '',
               description: data.description || '',
-              category_id: data.category_id || '', // <-- 4. SET category_id
+              category_id: data.category_id || '',
               price: data.price || '',
               image_url: data.image_url || '',
               ingredients: data.ingredients.map(ing => ({
@@ -65,30 +68,46 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
                   name: ing.name,
                   quantity_consumed: ing.quantity_consumed,
                   unit_of_measurement: ing.unit_of_measurement
-              })) || []
+              })) || [],
+
+             is_promo: data.is_promo || false,
+              promo_discount_percentage: data.promo_discount_percentage || '',
+              // Format "2025-11-01T00:00:00.000Z" to "2025-11-01"
+              promo_expiry_date: data.promo_expiry_date 
+                ? new Date(data.promo_expiry_date).toISOString().split('T')[0] 
+                : ''
+
             });
-            // --- REMOVED ---
-            // setSelectedDropdownCategory(data.category || '');
           } catch (err) {
             toast.error(err.message);
+
             setFormData({
               item_name: itemToEdit.item_name || '',
               description: itemToEdit.description || '',
-              category_id: itemToEdit.category_id || '', // <-- 4. SET category_id
+              category_id: itemToEdit.category_id || '',
               price: itemToEdit.price || '',
               image_url: itemToEdit.image_url || '',
-              ingredients: []
+              ingredients: [],
+
+              is_promo: itemToEdit.is_promo || false,
+              promo_discount_percentage: itemToEdit.promo_discount_percentage || '',
+              // Format "2025-11-01T00:00:00.000Z" to "2025-11-01"
+              promo_expiry_date: itemToEdit.promo_expiry_date 
+                ? new Date(itemToEdit.promo_expiry_date).toISOString().split('T')[0] 
+                : ''
+
             });
           }
         };
         fetchItemDetails();
         
       } else {
-        // Reset form for "Add New"
-        setFormData({ item_name: '', description: '', category_id: '', price: '', image_url: '', ingredients: [] }); // <-- 4. SET category_id
-        // --- REMOVED ---
-        // setSelectedDropdownCategory('');
-        // setNewCategoryName('');
+
+        setFormData({ 
+          item_name: '', description: '', category_id: '', price: '', image_url: '', ingredients: [],
+          is_promo: false, promo_discount_percentage: '', promo_expiry_date: ''
+        });
+
       }
       setSelectedIngredientId('');
       setIngredientQuantity('');
@@ -99,8 +118,13 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    const { id, value } = e.target;
-    setFormData((prevData) => ({ ...prevData, [id]: value }));
+    // --- UPDATED LOGIC ---
+    const { id, value, type, checked } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [id]: type === 'checkbox' ? checked : value,
+    }));
+    // --- END OF UPDATE ---
   };
   
 
@@ -329,6 +353,68 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
                   ))}
                 </ul>
               )}
+              {/* --- ADD THIS ENTIRE PROMO SECTION --- */}
+            <div style={{ 
+              border: '1px solid #E5E7EB', // gray-200
+              borderRadius: '0.375rem', // rounded-md
+              padding: '16px', 
+              marginTop: '16px',
+              backgroundColor: '#F9FAFB' // gray-50
+            }}>
+              
+              {/* Checkbox */}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  id="is_promo"
+                  checked={formData.is_promo}
+                  onChange={handleChange}
+                  style={{ 
+                    height: '16px', 
+                    width: '16px', 
+                    marginRight: '8px',
+                    cursor: 'pointer'
+                  }}
+                />
+                <label htmlFor="is_promo" style={{ ...labelStyle, cursor: 'pointer' }}>
+                  This is a promotional item
+                </label>
+              </div>
+
+              {/* Conditional Promo Fields */}
+              {formData.is_promo && (
+                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label htmlFor="promo_discount_percentage" style={labelStyle}>
+                      Discount (%)
+                    </label>
+                    <input
+                      type="number"
+                      id="promo_discount_percentage"
+                      value={formData.promo_discount_percentage}
+                      onChange={handleChange}
+                      style={inputStyle}
+                      placeholder="e.g., 15"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="promo_expiry_date" style={labelStyle}>
+                      Promo Expiry Date
+                    </label>
+                    <input
+                      type="date"
+                      id="promo_expiry_date"
+                      value={formData.promo_expiry_date}
+                      onChange={handleChange}
+                      style={inputStyle}
+                      placeholder="YYYY-MM-DD"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            {/* --- END OF PROMO SECTION --- */}
             </div>
           </div>
         </form>
