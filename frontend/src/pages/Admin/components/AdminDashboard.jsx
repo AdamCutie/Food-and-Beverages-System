@@ -11,8 +11,7 @@ const AdminDashboard = () => {
       ordersGrowth: 0,
       lowStock: 0,
       lowStockGrowth: 0,
-      totalCustomers: 0,
-      customerGrowth: 0,
+      totalStaff: 0,
     },
     recentOrders: [],
     stockAlerts: [],
@@ -105,18 +104,9 @@ const AdminDashboard = () => {
         <div className="bg-[#5c0e0e] rounded-xl p-5 shadow-md border border-[#6e1a1a]">
           <div className="flex justify-between items-center mb-2">
             <Users className="text-green-400" size={28} />
-            <span
-              className={`text-xs font-semibold ${
-                summary.customerGrowth >= 0 ? "text-green-400" : "text-red-400"
-              }`}
-            >
-              {summary.customerGrowth >= 0
-                ? `+${summary.customerGrowth}%`
-                : `${summary.customerGrowth}%`}
-            </span>
           </div>
-          <h3 className="text-sm text-gray-300">Total Customers</h3>
-          <p className="text-3xl font-bold mt-1">{summary.totalCustomers}</p>
+          <h3 className="text-sm text-gray-300">Total Staff</h3>
+          <p className="text-3xl font-bold mt-1">{summary.totalStaff}</p>
         </div>
       </div>
 
@@ -126,9 +116,6 @@ const AdminDashboard = () => {
         <div className="bg-[#fff2e0] text-black rounded-xl shadow-lg p-5">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold">Recent Orders</h2>
-            <button className="text-sm text-orange-600 hover:underline">
-              View All
-            </button>
           </div>
           {recentOrders.length > 0 ? (
             <ul>
@@ -202,9 +189,6 @@ const AdminDashboard = () => {
           ) : (
             <p className="text-gray-600 text-center">No low-stock items</p>
           )}
-          <button className="mt-4 w-full bg-[#5b0c0c] text-white py-2 rounded-md hover:bg-[#6e1212] transition">
-            Create Purchase Order
-          </button>
         </div>
       </div>
 
