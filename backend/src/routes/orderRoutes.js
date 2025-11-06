@@ -6,7 +6,7 @@ import {
     updateOrderStatus,
     getKitchenOrders,
     getServedOrders,
-    createPosOrder 
+    createPosOrder
 } from "../controllers/orderController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
@@ -25,7 +25,6 @@ router.get(
     authorizeRoles("admin", "waiter", "cashier"), 
     getServedOrders
 );
-// --- END OF CHANGE ---
 
 router.post(
     "/pos", 

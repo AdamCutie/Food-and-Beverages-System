@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Search } from 'lucide-react';
+import { ShoppingCart, Search, Bell} from 'lucide-react';
 import ProfileDropdown from '../../../components/ProfileDropdown';
 
 //temporary color object
@@ -7,7 +7,7 @@ const primaryColor = {
   backgroundColor: '#0B3D2E'
 };
 
-export default function HeaderBar({ cartCount, onCartToggle, searchTerm, onSearchChange }) {
+export default function HeaderBar({ cartCount, onCartToggle, searchTerm, onSearchChange, notificationCount, onNotificationToggle }) {
   return (
     <header style={primaryColor} className="grid grid-cols-3 items-center px-6 py-4 shadow-sm sticky top-0 z-10" >
 
@@ -30,8 +30,23 @@ export default function HeaderBar({ cartCount, onCartToggle, searchTerm, onSearc
         />
       </div>
 
+      
+
       {/* Right Column: Cart & Profile */}
-      <div className="justify-self-end flex items-center gap-4">        
+      <div className="justify-self-end flex items-center gap-4">     
+        {/* Notification Button */}
+        <button
+          onClick={onNotificationToggle}
+          className="relative text-white p-3 rounded-full hover:bg-white/20 transition"
+        >
+          <Bell size={22} />
+          {notificationCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+              {notificationCount}
+            </span>
+          )}
+        </button>
+           
         {/* Cart Button */}
         <button
           onClick={onCartToggle}

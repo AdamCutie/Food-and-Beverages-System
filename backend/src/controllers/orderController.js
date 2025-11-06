@@ -156,6 +156,10 @@ export const createOrder = async (req, res) => {
             order_id
         ]);
 
+        // --- ADDED: Create the first "pending" notification ---
+        await createOrUpdateNotification(order_id, customer_id, 'pending', connection);
+        // --- END OF ADDITION ---
+
         await connection.commit();
 
         res.status(201).json({
@@ -177,10 +181,8 @@ export const createOrder = async (req, res) => {
 // @route   GET /api/orders
 // @access  Private
 export const getOrders = async (req, res) => {
-    // This function is unchanged, your JOIN was correct.
+    // This function is unchanged
     try {
-        // --- THIS IS THE FIX ---
-        // We now JOIN the customers table to get the name
         const sql = `
             SELECT 
                 o.*,
@@ -191,8 +193,6 @@ export const getOrders = async (req, res) => {
             ORDER BY o.order_date DESC
         `;
         const [orders] = await pool.query(sql);
-        // --- END OF FIX ---
-
         res.json(orders);
     } catch (error) {
         console.error("Error fetching orders:", error);
@@ -204,7 +204,7 @@ export const getOrders = async (req, res) => {
 // @route   GET /api/orders/:id
 // @access  Private
 export const getOrderById = async (req, res) => {
-  // This function is unchanged, your logic was correct.
+  // This function is unchanged
   try {
     const { id } = req.params;
 
@@ -223,7 +223,7 @@ export const getOrderById = async (req, res) => {
         od.quantity, 
         mi.price,
         od.instructions,
-        od.order_detail_id AS detail_id /* <-- This is the final fix */
+        od.order_detail_id AS detail_id
     FROM order_details od 
     JOIN menu_items mi ON od.item_id = mi.item_id 
     WHERE od.order_id = ?`,
@@ -254,9 +254,6 @@ export const getOrderById = async (req, res) => {
 };
 
 
-// --- CHANGE 3: THIS ENTIRE FUNCTION IS REPLACED ---
-// This new function fixes the 'cancelled' NULL bug,
-// the 'staff_id' bug, and removes 'completed' logic.
 // @desc    Update any order status
 // @route   PUT /api/orders/:id/status
 // @access  Private (Staff)
@@ -265,39 +262,30 @@ export const updateOrderStatus = async (req, res) => {
     const { status } = req.body; 
     const connection = await pool.getConnection();
     
-    // 1. Get staff_id from authenticated user
     const staff_id = req.user.id; 
-    
-    // 2. Normalize status to lowercase (FIXES THE BUG)
-    // This means the frontend can send "Cancelled", "cancelled", or "CANCELLED"
-    // and it will all be converted to "cancelled" to match the database.
     const newStatus = status.toLowerCase();
 
-    // 3. Validate status against our new ENUM list
     const validStatuses = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
     if (!validStatuses.includes(newStatus)) {
-        // If the status isn't in our list, reject it.
         return res.status(400).json({ message: `Invalid status: ${status}` });
     }
 
     try {
         await connection.beginTransaction();
 
-        // 4. Get current order status
-        const [orders] = await connection.query("SELECT status FROM orders WHERE order_id = ? FOR UPDATE", [id]);
+        // Get current order status AND customer_id
+        const [orders] = await connection.query("SELECT status, customer_id FROM orders WHERE order_id = ? FOR UPDATE", [id]);
         if (orders.length === 0) {
             throw new Error("Order not found");
         }
         const currentStatus = orders[0].status;
+        const customer_id = orders[0].customer_id; // Get customer_id
 
-        // 5. Check if a change is even needed
         if (currentStatus === newStatus) {
              return res.status(400).json({ message: `Order is already ${newStatus}` });
         }
 
-        // --- 6. BUSINESS LOGIC BLOCK ---
-        
-        // Rule 1: Deduct stock when moving from pending to preparing
+        // --- BUSINESS LOGIC BLOCK ---
         if (newStatus === 'preparing' && currentStatus === 'pending') {
             console.log(`Deducting stock for order ${id}...`);
             const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
@@ -307,7 +295,6 @@ export const updateOrderStatus = async (req, res) => {
             await logOrderStockChange(id, details, 'ORDER_DEDUCT', connection);
             console.log(`Ingredient stock deducted and logged for order ${id}`);
 
-        // Rule 2: Restore stock if an order is cancelled
         } else if (newStatus === 'cancelled') {
             if (currentStatus === 'preparing' || currentStatus === 'ready') {
                 const [payments] = await connection.query("SELECT * FROM payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
@@ -315,7 +302,6 @@ export const updateOrderStatus = async (req, res) => {
                 if (payments.length > 0) {
                     console.warn(`Order ${id} was already paid. Cancellation requested, but stock NOT restored automatically.`);
                 } else {
-                    // Only restore stock if it's NOT paid
                     console.log(`Restoring ingredient stock for cancelled unpaid order: ${id}`);
                     const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
                     
@@ -323,16 +309,10 @@ export const updateOrderStatus = async (req, res) => {
                     await logOrderStockChange(id, details, 'ORDER_RESTORE', connection);
                 }
             }
-        
-        // Rule 3: (Removed)
-        // No more logic for 'completed' is needed.
-        
         }
         // --- END OF BUSINESS LOGIC BLOCK ---
 
-        // 7. --- UNIFIED DATABASE UPDATE (FIXES staff_id BUG) ---
-        // This query updates the status AND the staff_id of the person who made the change.
-        // This runs for 'preparing', 'ready', 'served', and 'cancelled'.
+        // Update the order status and who updated it
         const [result] = await connection.query(
             "UPDATE orders SET status = ?, staff_id = ? WHERE order_id = ?", 
             [newStatus, staff_id, id]
@@ -342,23 +322,24 @@ export const updateOrderStatus = async (req, res) => {
             throw new Error("Order not found or status unchanged");
         }
 
+        // --- ADDED: Create/Update the notification ---
+        await createOrUpdateNotification(id, customer_id, newStatus, connection);
+        // --- END OF ADDITION ---
+
         await connection.commit();
         res.json({ message: `Order status updated to ${newStatus}` });
 
     } catch (error) {
         await connection.rollback();
-        // Send specific error messages to the frontend
         if (error.message.startsWith("Not enough stock")) {
             return res.status(400).json({ message: error.message });
         }
-        // General server error
         console.error("Error updating order status:", error);
         res.status(500).json({ message: "Failed to update order status", error: error.message });
     } finally {
         connection.release();
     }
 };
-// --- END OF REPLACED FUNCTION ---
 
 
 // @desc    Get kitchen orders (pending, preparing, ready)
@@ -366,8 +347,6 @@ export const updateOrderStatus = async (req, res) => {
 // @access  Private (Staff)
 export const getKitchenOrders = async (req, res) => {
     try {
-        // --- CHANGE 4: Use lowercase status names ---
-        // This query now matches your database ENUM and will work.
         const sql = `
             SELECT o.*, c.first_name, c.last_name
             FROM orders o
@@ -390,8 +369,6 @@ export const getKitchenOrders = async (req, res) => {
 // @access  Private (Staff)
 export const getServedOrders = async (req, res) => {
     try {
-        // --- CHANGE 5: Use lowercase and remove 'Completed' ---
-        // This now correctly fetches only 'served' orders as the final state.
         const sql = `
             SELECT o.*, c.first_name, c.last_name
             FROM orders o
@@ -405,4 +382,58 @@ export const getServedOrders = async (req, res) => {
         console.error("Error fetching served orders:", error);
         res.status(500).json({ message: "Error fetching served orders", error: error.message });
     }
+};
+
+
+// --- NEW HELPER FUNCTION TO CREATE NOTIFICATIONS ---
+const createOrUpdateNotification = async (order_id, customer_id, status, connection) => {
+  // If there's no customer_id (e.g., a POS order), we can't create a notification.
+  if (!customer_id) {
+    return;
+  }
+
+  try {
+    // Step 1: Delete any existing notifications for this order.
+    // This ensures the customer only sees the *latest* status.
+    const deleteSql = "DELETE FROM notifications WHERE order_id = ?";
+    await (connection || pool).query(deleteSql, [order_id]);
+
+    // Step 2: Define the message based on the status.
+    let title = `Order #${order_id} Updated!`;
+    let message = `Your order #${order_id} is now ${status}.`;
+
+    switch (status) {
+      case 'pending':
+        title = 'Order Placed!';
+        message = `Your order #${order_id} is now pending.`;
+        break;
+      case 'preparing':
+        title = 'Order Preparing!';
+        message = `Your order #${order_id} is now being prepared.`;
+        break;
+      case 'ready':
+        title = 'Order Ready!';
+        message = `Your order #${order_id} is ready for pickup/delivery!`;
+        break;
+      case 'served':
+        title = 'Order On Its Way!';
+        message = `Your order #${order_id} is on its way for delivery!`;
+        break;
+      case 'cancelled':
+        title = 'Order Cancelled';
+        message = `Your order #${order_id} has been cancelled.`;
+        break;
+    }
+
+    // Step 3: Insert the new notification. (It's unread by default)
+    const insertSql = `
+      INSERT INTO notifications (customer_id, order_id, title, message, is_read)
+      VALUES (?, ?, ?, ?, 0)
+    `;
+    await (connection || pool).query(insertSql, [customer_id, order_id, title, message]);
+
+  } catch (error) {
+    // Log the error but don't crash the main transaction
+    console.error(`Failed to create notification for order ${order_id}:`, error.message);
+  }
 };

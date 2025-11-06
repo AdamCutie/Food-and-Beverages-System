@@ -9,8 +9,9 @@ import CartPanel from './components/CartPanel';
 import ImageModal from './components/ImageModal';
 import PaymentModal from './components/PaymentModal';
 import ReceiptModal from './components/ReceiptModal';
+import NotificationPanel from './components/NotificationPanel';
 import toast from 'react-hot-toast';
-import apiClient from '../../utils/apiClient'; // This should be here from our previous step
+import apiClient from '../../utils/apiClient';
 
 const primaryColor = { backgroundColor: '#0B3D2E' };
 
@@ -30,8 +31,12 @@ function MenuPage() {
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
-  const [pendingOrderTotal, setPendingOrderTotal] = useState(0); // We still use this for display
+  const [pendingOrderTotal, setPendingOrderTotal] = useState(0); 
   const [receiptDetails, setReceiptDetails] = useState(null);
+  
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   const { user, token, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -65,8 +70,70 @@ function MenuPage() {
     fetchItems();
   }, []);
 
+  useEffect(() => {
+    // Only start polling if the user is authenticated
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const POLLING_INTERVAL = 10000; // 10 seconds
+
+    const fetchNotifications = async () => {
+      // Don't fetch if the panel is open, because we're interacting with it
+      if (isNotificationPanelOpen) {
+        return;
+      }
+
+      try {
+        const res = await apiClient('/notifications');
+        if (!res.ok) {
+          console.error('Failed to poll for notifications');
+          return;
+        }
+        
+        const data = await res.json(); // This is an object: { notifications: [], unreadCount: 0 }
+
+        // Set the state from the database
+        setNotifications(data.notifications || []);
+        setUnreadNotificationCount(data.unreadCount || 0);
+
+      } catch (err) {
+        if (err.message !== 'Session expired') {
+          console.error('Polling error:', err);
+        }
+      }
+    };
+
+    // Run once immediately, then set the interval
+    fetchNotifications();
+    const intervalId = setInterval(fetchNotifications, POLLING_INTERVAL);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
+
+  }, [isAuthenticated, isNotificationPanelOpen]); 
+
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
   const toggleCart = () => setIsCartOpen(!isCartOpen);
+  const toggleNotificationPanel = () => {
+    // Optimistically open the panel immediately
+    const panelWillBeOpen = !isNotificationPanelOpen;
+    setIsNotificationPanelOpen(panelWillBeOpen);
+
+    // If the panel is opening, mark all as read
+    if (panelWillBeOpen) {
+      // Optimistically set count to 0
+      setUnreadNotificationCount(0);
+      
+      // Tell the backend to mark them as read
+      apiClient('/notifications/mark-read', {
+        method: 'PUT'
+      }).catch(err => {
+        // If it fails, log it but don't bother the user
+        console.error("Failed to mark notifications as read:", err);
+      });
+    }
+  };
   const handleSelectCategory = (category) => setSelectedCategory(category);
   const handleAddToCart = (clickedItem) => {
     setCartItems(prevItems => {
@@ -212,6 +279,8 @@ function MenuPage() {
         onCartToggle={toggleCart}
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
+        notificationCount={unreadNotificationCount}
+        onNotificationToggle={toggleNotificationPanel}
       />
 
       <main className="container mx-auto px-4 py-8">
@@ -258,6 +327,12 @@ function MenuPage() {
         isOpen={isReceiptModalOpen}
         onClose={handleCloseReceipt}
         orderDetails={receiptDetails}
+      />
+
+      <NotificationPanel
+        isOpen={isNotificationPanelOpen}
+        onClose={toggleNotificationPanel}
+        notifications={notifications}
       />
 
       <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />

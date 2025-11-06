@@ -17,8 +17,9 @@ import adminRoutes from "../src/routes/adminRoutes.js";
 import uploadRoutes from './routes/uploadRoutes.js';
 import inventoryRoutes from "../src/routes/inventoryRoutes.js";
 import categoryRoutes from "../src/routes/categoryRoutes.js";
-import analyticsRoutes from "../src/routes/analyticsRoutes.js"; // --- 1. IMPORT NEW ROUTE ---
+import analyticsRoutes from "../src/routes/analyticsRoutes.js";
 import dashboardRoutes from "../src/routes/dashboardRoutes.js";
+import notificationRoutes from "../src/routes/notificationRoutes.js";
 
 dotenv.config();
 
@@ -51,9 +52,9 @@ app.use("/api/items", itemRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use('/api/inventory', inventoryRoutes);
-app.use("/api/analytics", analyticsRoutes); // --- 2. ADD NEW ROUTE (PROTECTED) ---
+app.use("/api/analytics", analyticsRoutes); 
 app.use('/api/dashboard', dashboardRoutes);
-
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes); // Upload Image route
 const __dirname = path.resolve();
 app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
