@@ -126,7 +126,7 @@ const AnalyticsDashboard = () => {
       {/* Order Type Distribution */}
       <div style={styles.card}>
         <h3 style={styles.cardTitle}>Order Type Distribution</h3>
-        <ResponsiveContainer width="100%" height={250}>
+        <ResponsiveContainer width="100%" height={300}>
           <PieChart>
             <Pie
               data={orderTypeData}
