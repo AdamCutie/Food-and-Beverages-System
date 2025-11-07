@@ -167,7 +167,7 @@ function KitchenPage() {
             >
               <option value="All Types">All Types</option>
               <option value="Dine-in">Dine-in</option>
-              <option value="Room Service">Room Service</option>
+              <option value="Room Dining">Room Dining</option>
               <option value="Walk-in">Walk-in</option>
               <option value="Walk-in">Phone Order</option>
             </select>

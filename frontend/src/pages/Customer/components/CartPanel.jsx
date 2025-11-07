@@ -79,12 +79,12 @@ const CartPanel = ({
               Dine-in
             </button>
             <button
-              onClick={() => setOrderType('Room Service')}
+              onClick={() => setOrderType('Room Dining')}
               className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
-                orderType === 'Room Service' ? 'bg-green-900 text-white' : 'bg-gray-200 text-gray-700'
+                orderType === 'Room Dining' ? 'bg-green-900 text-white' : 'bg-gray-200 text-gray-700'
               }`}
             >
-              Room Service
+              Room Dining
             </button>
           </div>
 
