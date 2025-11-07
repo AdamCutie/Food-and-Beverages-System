@@ -208,9 +208,9 @@ function KitchenPage() {
 
                  <div className="text-center mb-3">
                    <span className={`py-1 px-3 rounded-full text-xs font-semibold ${
-                        order.status.toLowerCase() === 'pending' ? 'bg-yellow-200 text-yellow-800' :
-                        order.status.toLowerCase() === 'preparing' ? 'bg-blue-200 text-blue-800' :
-                        order.status.toLowerCase() === 'ready' ? 'bg-green-200 text-green-800' :
+                        order.status?.toLowerCase() === 'pending' ? 'bg-yellow-200 text-yellow-800' :
+                        order.status?.toLowerCase() === 'preparing' ? 'bg-blue-200 text-blue-800' :
+                        order.status?.toLowerCase() === 'ready' ? 'bg-green-200 text-green-800' :
                         'bg-gray-200 text-gray-800'
                       }`}
                     >
