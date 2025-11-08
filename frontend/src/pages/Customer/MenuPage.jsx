@@ -207,14 +207,16 @@ function MenuPage() {
 
   // --- 2. THIS IS THE FIX ---
   // `totalAmount` argument is removed.
-  const handleConfirmPayment = async (paymentInfo) => {
+const handleConfirmPayment = async (paymentInfo) => {
     setIsPaymentModalOpen(false);
-    setIsPlacingOrder(true);
-    toast.loading('Placing your order...');
+      setTimeout(() => {
+      setIsPlacingOrder(true);
+      toast.loading('Placing your order...');
+    }, 0);
 
+    // Prepare order data - backend will calculate total
     const orderData = {
       customer_id: user.id,
-      // 'total_price' is removed. Backend will calculate.
       order_type: orderType,
       instructions: instructions,
       delivery_location: deliveryLocation,
@@ -224,53 +226,67 @@ function MenuPage() {
         price: item.price
       }))
     };
-    // --- END OF FIX 2 ---
 
     try {
-      // Step 1: Create the order. Backend calculates total.
+      // Step 1: Create the order
       const orderResponse = await apiClient('/orders', {
         method: 'POST',
         body: JSON.stringify(orderData)
       });
+      
       const orderResult = await orderResponse.json();
-      if (!orderResponse.ok) throw new Error(orderResult.message || 'Failed to create order.');
+      
+      if (!orderResponse.ok) {
+        throw new Error(orderResult.message || 'Failed to create order.');
+      }
 
       const newOrderId = orderResult.order_id;
-      // --- 3. THIS IS THE FIX ---
-      // We use the SECURE total returned from the backend for the payment.
-      const orderTotal = orderResult.total_amount;
-      // --- END OF FIX 3 ---
 
       toast.dismiss();
-      toast.loading('Redirecting to PayMongo checkout...');
+      toast.loading('Creating PayMongo checkout...');
 
-      // Step 2: Create PayMongo Checkout Session
+      // Step 2: Create PayMongo payment link
+      // ✅ FIX: No body needed - backend gets order total from database
       const paymentResponse = await apiClient(`/payments/${newOrderId}/paymongo`, {
         method: 'POST',
-        body: JSON.stringify({
-          total_amount: orderTotal, // Pass the secure total
-          payment_method: paymentInfo.selectedPaymentMethod
-        })
+        headers: {
+          'Content-Type': 'application/json'
+        }
+        // ❌ OLD (WRONG): body: JSON.stringify({ total_amount: xxx, payment_method: xxx })
+        // ✅ NEW (CORRECT): No body needed!
       });
 
       const paymentResult = await paymentResponse.json();
-      if (!paymentResponse.ok) throw new Error(paymentResult.message || 'Failed to create checkout.');
-
-      // Step 3: Redirect to PayMongo Checkout Page
-      if (paymentResult.checkoutUrl) {
-        window.location.href = paymentResult.checkoutUrl;
-      } else {
-        throw new Error("Missing checkout URL from PayMongo response.");
+      
+      if (!paymentResponse.ok) {
+        throw new Error(paymentResult.message || 'Failed to create PayMongo checkout.');
       }
+
+      toast.dismiss();
+      toast.success('Redirecting to PayMongo...');
+
+      // Step 3: Redirect to PayMongo checkout
+      if (paymentResult.checkout_url) {
+        // Save order info before redirect (optional - for return handling)
+        localStorage.setItem('pending_order_id', newOrderId);
+        
+        // Redirect to PayMongo
+        window.location.href = paymentResult.checkout_url;
+      } else {
+        throw new Error("Missing checkout URL from PayMongo.");
+      }
+
     } catch (err) {
       console.error('Order/Payment Error:', err);
       toast.dismiss();
+      
       if (err.message !== 'Session expired') {
         toast.error(`Error: ${err.message}`);
       }
+      
       setIsPlacingOrder(false);
     }
-  };
+};
 
   const handleCloseReceipt = () => {
     setIsReceiptModalOpen(false);

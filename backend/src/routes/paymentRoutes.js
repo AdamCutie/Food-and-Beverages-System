@@ -1,11 +1,10 @@
 import express from "express";
 import bodyParser from "body-parser";
 import {
+  createPayMongoPayment,
+  paymongoWebhook,
   recordPayment,
   getPaymentsForOrder,
-  simulatePayment,
-  createPaymongoCheckout,
-  handlePaymongoWebhook,
 } from "../controllers/paymentController.js";
 
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
@@ -15,9 +14,8 @@ const router = express.Router();
 /* -------------------------
    🔒 Protected Routes
 -------------------------- */
-
-// 1️⃣ Simulate Payment (for testing)
-router.put("/:order_id/simulate", protect, simulatePayment);
+// Customer create Payment
+router.post('/:order_id/paymongo', protect, authorizeRoles("customer"), createPayMongoPayment);
 
 // 2️⃣ Manual Record (Cashier/Admin use)
 router.post("/", protect, authorizeRoles("cashier", "admin"), recordPayment);
@@ -29,20 +27,12 @@ router.get("/:order_id", protect, authorizeRoles("cashier", "admin"), getPayment
    💳 PayMongo Routes
 -------------------------- */
 
-// 4️⃣ Create PayMongo Checkout Session
-// --- THIS IS THE FIX: Added bodyParser.json() middleware ---
-router.post(
-  "/:order_id/paymongo",
-  bodyParser.json(), // <-- ADD THIS LINE
-  protect,
-  createPaymongoCheckout
-);
 
 // 5️⃣ Webhook (PayMongo calls this directly — no auth, must use raw body)
 router.post(
   "/webhook",
-  bodyParser.raw({ type: "application/json" }),
-  handlePaymongoWebhook
+  express.json({ type: "application/json" }),
+  paymongoWebhook
 );
 
 export default router;
