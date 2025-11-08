@@ -565,3 +565,6 @@ COMMIT;
 
 ALTER TABLE `ingredients`
 ADD COLUMN `reorder_point` DECIMAL(10, 2) NOT NULL DEFAULT 10.00 AFTER `unit_of_measurement`;
+
+ALTER TABLE `payments`
+  ADD COLUMN `paymongo_payment_id` VARCHAR(255) NULL DEFAULT NULL AFTER `payment_status`;
