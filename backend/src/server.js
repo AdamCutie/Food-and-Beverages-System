@@ -4,6 +4,8 @@ import cors from "cors";
 import pool from "../src/config/mysql.js";
 import path from "path";
 
+dotenv.config();
+
 // Middleware
 import { notFound, errorHandler } from "../src/middleware/errorMiddleware.js";
 import { apiLimiter, authLimiter } from "../src/middleware/rateLimiter.js";
@@ -21,7 +23,6 @@ import analyticsRoutes from "../src/routes/analyticsRoutes.js";
 import dashboardRoutes from "../src/routes/dashboardRoutes.js";
 import notificationRoutes from "../src/routes/notificationRoutes.js";
 
-dotenv.config();
 
 const app = express();
 app.use(cors());
