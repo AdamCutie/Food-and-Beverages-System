@@ -1,10 +1,10 @@
 import express from "express";
 import dotenv from "dotenv";
+dotenv.config();
 import cors from "cors";
 import pool from "../src/config/mysql.js";
 import path from "path";
 
-dotenv.config();
 
 // Middleware
 import { notFound, errorHandler } from "../src/middleware/errorMiddleware.js";
