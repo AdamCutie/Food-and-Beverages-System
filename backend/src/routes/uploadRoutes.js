@@ -38,11 +38,14 @@ const upload = multer({
 
 // Define the upload route: POST /api/upload
 router.post('/', upload.single('image'), (req, res) => {
-  // When the file is uploaded successfully, multer adds a 'file' object to the request.
-  // We send back the path to the file, which we will save in the database.
+  // When the file is uploaded, multer gives us the clean, safe FILENAME.
+  // We will build the correct URL path ourselves.
+  const imageUrl = `/uploads/${req.file.filename}`;
+
+  // We send back the clean path to be saved in the database.
   res.send({
     message: 'Image Uploaded',
-    image: `/${req.file.path}`,
+    image: imageUrl, // This will always be a clean /uploads/image-123.jpg
   });
 });
 

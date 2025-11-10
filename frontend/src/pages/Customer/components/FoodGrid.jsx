@@ -1,7 +1,6 @@
 import React from 'react';
-
+const BASE_SERVER_URL = 'http://66.181.46.64';
 // --- All styles are defined here ---
-
 const cardStyle = {
   backgroundColor: '#fff2e0', // Your 'secondaryColor'
   borderRadius: '0.5rem', // 8px
@@ -125,6 +124,15 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle }) => {
     };
   };
 
+    // Helper function to clean up old, bad image paths from the database
+  const getCleanImagePath = (path) => {
+    if (!path) return null;
+    // Replaces all backslashes with forward slashes
+    // and ensures it starts with a single /
+    const cleaned = path.replace(/\\/g, '/').replace(/^\/+/, '/');
+    return `${BASE_SERVER_URL}${cleaned}`;
+  };
+
   return (
     <div style={layoutStyle}>
       {items.map((item) => {
@@ -141,6 +149,8 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle }) => {
           opacity: !item.is_available ? 0.8 : 1,
         };
 
+       const imageUrl = getCleanImagePath(item.image_url);
+
         return (
           <div
             key={item.item_id}
@@ -149,15 +159,15 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle }) => {
             <div style={{ position: 'relative' }}>
               <img
                 src={
-                  item.image_url
-                    ? `http://localhost:3000${item.image_url}`
+                  imageUrl // Use the cleaned URL
+                    ? imageUrl
                     : 'https://via.placeholder.com/400x300.png?text=No+Image'
                 }
                 alt={item.item_name}
                 style={cardImageStyle}
                 onClick={() =>
                   onImageClick(
-                    item.image_url ? `http://localhost:3000${item.image_url}` : null
+                    imageUrl ? imageUrl : null // Use the cleaned URL
                   )
                 }
               />
