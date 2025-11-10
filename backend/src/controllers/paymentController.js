@@ -151,7 +151,7 @@ export const paymongoWebhook = async (req, res) => {
 
         const computedSignature = crypto
             .createHmac('sha256', webhookSecret)
-            .update(JSON.stringify(req.body))
+            .update(req.body)
             .digest('hex');
 
         if (signature !== computedSignature) {
@@ -159,13 +159,13 @@ export const paymongoWebhook = async (req, res) => {
             return res.status(401).json({ message: "Invalid webhook signature" });
         }
 
-        const event = req.body.data;
+        const event = JSON.parse(req.body.toString());
 
         // Handle payment.paid event
-        if (event.attributes.type === 'payment.paid') {
+        if (event.data.attributes.type === 'payment.paid') {
             await connection.beginTransaction();
 
-            const paymentData = event.attributes.data;
+            const paymentData = event.data.attributes.data;
             const order_id = paymentData.attributes.metadata?.order_id;
             const amount = paymentData.attributes.amount / 100; // Convert from cents
 
@@ -257,7 +257,7 @@ export const recordPayment = async (req, res) => {
         const [paymentResult] = await connection.query(paymentSql, [order_id, payment_method, amount, change_amount || 0]);
 
         // Update order status to paid
-        await connection.query("UPDATE orders SET status = 'pending' WHERE order_id = ?", [order_id]);
+        await connection.query("UPDATE orders SET status = 'paid' WHERE order_id = ?", [order_id]);
 
         await connection.commit();
 

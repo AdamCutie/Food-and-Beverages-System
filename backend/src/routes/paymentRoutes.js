@@ -31,7 +31,7 @@ router.get("/:order_id", protect, authorizeRoles("cashier", "admin"), getPayment
 // 5️⃣ Webhook (PayMongo calls this directly — no auth, must use raw body)
 router.post(
   "/webhook",
-  express.json({ type: "application/json" }),
+  express.raw({ type: "application/json" }),
   paymongoWebhook
 );
 
