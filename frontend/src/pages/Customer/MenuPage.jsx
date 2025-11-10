@@ -293,6 +293,49 @@ const handleConfirmPayment = async (paymentInfo) => {
     setReceiptDetails(null);
   };
 
+  // --- (NEW) HANDLER TO DELETE ONE NOTIFICATION ---
+  const handleDeleteNotification = async (notificationId) => {
+    try {
+      const res = await apiClient(`/notifications/${notificationId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete notification');
+      
+      // Optimistically update UI
+      setNotifications(prev => 
+        prev.filter(n => n.notification_id !== notificationId)
+      );
+      toast.success('Notification cleared.');
+    } catch (err) {
+      if (err.message !== 'Session expired') {
+        toast.error(err.message);
+      }
+    }
+  };
+
+  // --- (NEW) HANDLER TO CLEAR ALL NOTIFICATIONS ---
+  const handleClearAllNotifications = async () => {
+    if (!window.confirm('Are you sure you want to clear all notifications?')) {
+      return;
+    }
+    
+    try {
+      const res = await apiClient('/notifications/clear-all', {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to clear notifications');
+      
+      // Optimistically update UI
+      setNotifications([]);
+      setUnreadNotificationCount(0); // Also reset count
+      toast.success('All notifications cleared.');
+    } catch (err) {
+      if (err.message !== 'Session expired') {
+        toast.error(err.message);
+      }
+    }
+  };
+
   const filteredItems = items
     .filter(item => selectedCategory === 0 || item.category_id === selectedCategory)
     .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -355,10 +398,13 @@ const handleConfirmPayment = async (paymentInfo) => {
         orderDetails={receiptDetails}
       />
 
+      {/* --- (NEW) PASS PROPS TO PANEL --- */}
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
         onClose={toggleNotificationPanel}
         notifications={notifications}
+        onDeleteOne={handleDeleteNotification}
+        onClearAll={handleClearAllNotifications}
       />
 
       <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />

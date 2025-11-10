@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import ProfileDropdown from '../../../components/ProfileDropdown';
 import { useAuth } from '../../../context/AuthContext'; 
 
 const InternalNavBar = () => {
+  const { user } = useAuth();
+  
   const navLinkStyle = {
     color: 'white',
     textDecoration: 'none',
@@ -19,6 +21,24 @@ const InternalNavBar = () => {
     color: '#F9A825', // Accent color for active link
   };
 
+  const [isHovered, setIsHovered] = useState(false);
+
+  const baseAdminLinkStyle = {
+    color: 'white',
+    backgroundColor: '#523a2e',
+    border: '1px solid white',
+    textDecoration: 'none',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    fontWeight: 'bold',
+    fontSize: '16px',
+    transition: 'background-color 0.2s',
+  };
+  const hoverAdminLinkStyle = {
+    backgroundColor: '#F9A825', // Your orange accent
+    color: '#3C2A21', // Dark text for contrast
+    border: '1px solid #F9A825',
+  };
   return (
     <nav style={{
         backgroundColor: '#3C2A21', // Dark brown background
@@ -73,8 +93,21 @@ const InternalNavBar = () => {
         </NavLink>
       </div>
 
-      {/* Right: Profile Dropdown */}
-      <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+        
+        {/* --- NEW: Conditionally render Admin Dashboard link --- */}
+        {user && user.role === 'admin' && (
+          <Link
+            to="/admin"
+            style={isHovered ? { ...baseAdminLinkStyle, ...hoverAdminLinkStyle } : baseAdminLinkStyle}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            Go to Admin Dashboard
+          </Link>
+        )}
+        {/* --- END OF NEW LINK --- */}
+
         <ProfileDropdown />
       </div>
     </nav>

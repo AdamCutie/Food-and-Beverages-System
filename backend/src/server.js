@@ -31,7 +31,14 @@ import notificationRoutes from "../src/routes/notificationRoutes.js";
 
 
 const app = express();
-app.use(cors());
+
+// Configure CORS to be more permissive
+app.use(cors({
+  origin: '*', // Allows all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allows all methods
+  allowedHeaders: ['Content-Type', 'Authorization'], // Allows these headers
+}));
+
 app.use(express.json());
 
 // Test DB Connection
@@ -63,7 +70,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes); // Upload Image route
-app.use('/api/uploads', express.static(path.join(__dirname, '/api/uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Error middleware
 app.use(notFound);

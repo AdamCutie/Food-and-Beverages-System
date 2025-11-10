@@ -26,12 +26,17 @@ const LoginPage = () => {
   const { login, isAuthenticated } = useAuth();
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
+  try {
     await login(email, password);
-    setLoading(false);
-  };
+  } catch (error) {
+    toast.error(error.message);
+  } finally {
 
+    setLoading(false);
+  }
+};
   // If user is already logged in, redirect them away from the login page
   if (isAuthenticated) {
     // We can't use useAuth().handleRedirect() here as the user is already authenticated.

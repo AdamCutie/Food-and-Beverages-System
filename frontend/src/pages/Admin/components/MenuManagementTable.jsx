@@ -1,11 +1,13 @@
 import React from 'react';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, Search} from 'lucide-react';
 
 const MenuManagementTable = ({ 
   items,
   totalItems, 
   categories, 
   selectedCategory,
+  searchTerm,
+  onSearchChange,
   onFilterChange,
   onClearFilters,
   onAddItem, 
@@ -25,6 +27,11 @@ const MenuManagementTable = ({
       </div>
 
       <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-md shadow">
+      
+      {/* Filters Container */}
+      <div className="flex items-center gap-4">
+        
+        {/* Category Filter */}
         <div>
           <label htmlFor="categoryFilter" className="mr-2 text-sm font-medium text-gray-700">Filter by Category:</label>
           <select 
@@ -36,17 +43,33 @@ const MenuManagementTable = ({
             {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
           </select>
         </div>
+
+        {/* Search Bar (This section is now fixed) */}
+        <div>
+          <label htmlFor="menuSearch" className="mr-2 text-sm font-medium text-gray-700">Search:</label>
+          <div className="relative inline-block"> {/* This wrapper keeps the icon and input together */}
+            <input
+              type="text"
+              id="menuSearch"
+              placeholder="Search by item name..."
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="border border-gray-300 rounded-md p-2 pl-9 text-sm" // pl-9 for icon padding
+            />
+            {/* The icon is positioned relative to the div above */}
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          </div>
+        </div>
+
+      </div>
+
+      {/* Info Container */}
+      <div className="flex items-center gap-4">
         <span className="text-sm font-medium text-gray-700">
             Total Menu Items: {totalItems}
           </span>
-        <button 
-          onClick={onClearFilters}
-          className="text-sm text-blue-500 hover:underline"
-          disabled={selectedCategory === 'All'}
-        >
-          Clear Filters
-        </button>
       </div>
+    </div>
 
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <table className="min-w-full leading-normal">

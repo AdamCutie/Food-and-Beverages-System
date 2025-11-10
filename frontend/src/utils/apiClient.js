@@ -38,13 +38,22 @@ const apiClient = async (url, options = {}) => {
   try {
     const response = await fetch(`${API_BASE_URL}${url}`, options);
 
+    // Check for 401 error (Unauthorized)
     if (response.status === 401) {
-      localStorage.removeItem('authToken');
-      toast.error('Your session has expired. Please log in again.');
       
-      window.location.href = '/login'; 
-      
-      throw new Error('Session expired');
+      // --- THIS IS THE FIX ---
+      // Only force a reload IF the 401 error did NOT come from the login page.
+      // A 401 from /auth/login is just a "wrong password", not an "expired session".
+      if (url !== '/auth/login') { 
+        localStorage.removeItem('authToken');
+        toast.error('Your session has expired. Please log in again.');
+        
+        window.location.href = '/login'; 
+        
+        throw new Error('Session expired');
+      }
+      // If it WAS from /auth/login, we do nothing and just return the error response
+      // to be handled by the LoginPage.
     }
 
     return response;

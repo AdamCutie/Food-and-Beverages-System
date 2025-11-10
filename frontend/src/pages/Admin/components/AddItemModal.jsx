@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { X, UploadCloud, PlusCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import apiClient from '../../../utils/apiClient'; // <-- This should be here
+import apiClient from '../../../utils/apiClient'; 
 
+const BASE_SERVER_URL = 'http://66.181.46.64';
 // --- 1. categories prop is now the fetched list: [{category_id: 1, name: "Appetizer"}, ...]
 const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) => {
   const { token } = useAuth();
@@ -73,9 +74,9 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
              is_promo: data.is_promo || false,
               promo_discount_percentage: data.promo_discount_percentage || '',
               // Format "2025-11-01T00:00:00.000Z" to "2025-11-01"
-              promo_expiry_date: data.promo_expiry_date 
-                ? new Date(data.promo_expiry_date).toISOString().split('T')[0] 
-                : ''
+              promo_expiry_date: data.promo_expiry_date
+                ? new Date(data.promo_expiry_date).toISOString().split('T')[0]
+                : '',
 
             });
           } catch (err) {
@@ -118,13 +119,27 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    // --- UPDATED LOGIC ---
     const { id, value, type, checked } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [id]: type === 'checkbox' ? checked : value,
-    }));
-    // --- END OF UPDATE ---
+
+    setFormData((prevData) => {
+      const newData = {
+        ...prevData,
+        [id]: type === 'checkbox' ? checked : value,
+      };
+
+      // --- THIS IS THE FIX ---
+      // If the user just checked the 'is_promo' box
+      if (id === 'is_promo' && checked) {
+        // And if the expiry date is currently empty
+        if (!newData.promo_expiry_date) {
+          // Set it to today's date by default
+          newData.promo_expiry_date = new Date().toISOString().split('T')[0];
+        }
+      }
+      // --- END OF FIX ---
+
+      return newData;
+    });
   };
   
 
@@ -289,9 +304,15 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
             <div>
               {/* ... (Image upload JSX is unchanged) ... */}
               <label style={labelStyle}>Image</label>
+
               {formData.image_url && (
-                <img src={`http://localhost:3000${formData.image_url}`} alt="Preview" style={{ width: '100%', height: '128px', objectFit: 'cover', borderRadius: '0.375rem', margin: '8px 0' }} />
-              )}
+  <img 
+    src={`${BASE_SERVER_URL}${formData.image_url.replace(/\\/g, '/').replace(/^\/+/, '/')}`} 
+    alt="Preview" 
+    style={{ width: '100%', height: '128px', objectFit: 'cover', borderRadius: '0.375rem', margin: '8px 0' }} 
+  />
+)}
+
               <label htmlFor="image-upload" style={{
                 marginTop: '4px', display: 'flex', justifyContent: 'center', padding: '20px',
                 border: '2px dashed #D1D5DB', borderRadius: '0.375rem', cursor: 'pointer'

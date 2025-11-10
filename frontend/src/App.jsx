@@ -26,7 +26,20 @@ import AuthRoute from './components/routing/AuthRoute';
 function App() {
   return (
     <>
-      <Toaster position="top-center" />
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          // Default duration for all toasts
+          duration: 3000,
+          // Specific durations
+          success: {
+            duration: 2000,
+          },
+          error: {
+            duration: 4000, // <-- 4 seconds for errors
+          },
+        }}
+      />
       <Routes>
         {/* === AUTH ROUTES === */}
         <Route

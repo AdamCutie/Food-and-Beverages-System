@@ -60,3 +60,45 @@ export const markNotificationsAsRead = async (req, res) => {
     res.status(500).json({ message: "Failed to mark notifications as read", error: error.message });
   }
 };
+
+// --- NEW FUNCTION 1 ---
+// @desc    Delete a single notification by its ID
+// @route   DELETE /api/notifications/:id
+// @access  Private (Customer)
+export const deleteNotificationById = async (req, res) => {
+  try {
+    const customer_id = req.user.id; // From 'protect' middleware
+    const { id: notification_id } = req.params; // Get ID from URL
+
+    const sql = "DELETE FROM notifications WHERE notification_id = ? AND customer_id = ?";
+    const [result] = await pool.query(sql, [notification_id, customer_id]);
+
+    if (result.affectedRows === 0) {
+      // This means the notification either didn't exist or didn't belong to this user
+      return res.status(404).json({ message: "Notification not found" });
+    }
+
+    res.json({ message: "Notification deleted" });
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    res.status(500).json({ message: "Failed to delete notification", error: error.message });
+  }
+};
+
+// --- NEW FUNCTION 2 ---
+// @desc    Delete ALL notifications for the logged-in customer
+// @route   DELETE /api/notifications/clear-all
+// @access  Private (Customer)
+export const clearAllNotifications = async (req, res) => {
+  try {
+    const customer_id = req.user.id; // From 'protect' middleware
+
+    const sql = "DELETE FROM notifications WHERE customer_id = ?";
+    await pool.query(sql, [customer_id]);
+
+    res.json({ message: "All notifications cleared" });
+  } catch (error) {
+    console.error("Error clearing notifications:", error);
+    res.status(500).json({ message: "Failed to clear notifications", error: error.message });
+  }
+};
