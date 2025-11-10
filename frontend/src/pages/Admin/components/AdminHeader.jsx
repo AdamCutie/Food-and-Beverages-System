@@ -42,7 +42,7 @@ const hoverLinkStyle = {
 
   return (
     <nav style={{
-        backgroundColor: '#480c1b',
+        backgroundColor: '#330813ff',
         color: 'white',
         display: 'flex',
         alignItems: 'center',
