@@ -60,7 +60,9 @@ const footerStyle = {
 
 const priceContainerStyle = {
   display: 'flex',
-  flexDirection: 'column',
+  flexDirection: 'row',
+  alignItems: 'baseline', 
+  gap: '8px',
 };
 
 const priceStyle = {
