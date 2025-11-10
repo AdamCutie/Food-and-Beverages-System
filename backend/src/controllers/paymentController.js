@@ -151,7 +151,7 @@ export const paymongoWebhook = async (req, res) => {
 
         const computedSignature = crypto
             .createHmac('sha256', webhookSecret)
-            .update(JSON.stringify(req.body))
+            .update(req.body)
             .digest('hex');
 
         if (signature !== computedSignature) {
@@ -159,7 +159,7 @@ export const paymongoWebhook = async (req, res) => {
             return res.status(401).json({ message: "Invalid webhook signature" });
         }
 
-        const event = req.body.data;
+        const event = JSON.parse(req.body.toString());
 
         // Handle payment.paid event
         if (event.attributes.type === 'payment.paid') {

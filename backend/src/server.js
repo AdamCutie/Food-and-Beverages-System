@@ -1,14 +1,20 @@
 import express from "express";
 import dotenv from "dotenv";
-dotenv.config();
 import cors from "cors";
-import pool from "../src/config/mysql.js";
 import path from "path";
+import { fileURLToPath } from "url"; // <-- THIS IS THE MISSING LINE
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.resolve(__dirname, '../.env'); // Points to .env in the 'backend' folder
+dotenv.config({ path: envPath });
+
+import pool from "../src/config/mysql.js";
 
 // Middleware
 import { notFound, errorHandler } from "../src/middleware/errorMiddleware.js";
 import { apiLimiter, authLimiter } from "../src/middleware/rateLimiter.js";
+
 
 // Routes
 import authRoutes from "../src/routes/authRoutes.js";
@@ -57,8 +63,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes); // Upload Image route
-const __dirname = path.resolve();
-app.use('/uploads', express.static(path.join(__dirname, '/uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, '/api/uploads')));
 
 // Error middleware
 app.use(notFound);
