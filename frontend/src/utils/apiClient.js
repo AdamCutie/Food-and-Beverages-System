@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
 
 // The base URL for your API
-const API_BASE_URL = 'http://66.181.46.64/api';
+const API_BASE_URL = 'http://localhost:21917/api';
 
 /**
  * A wrapper around the native fetch function that automatically:
