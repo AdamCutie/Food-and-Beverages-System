@@ -149,17 +149,18 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle }) => {
             <div style={{ position: 'relative' }}>
               <img
                 src={
-                  item.image_url
-                    ? `http://localhost:3000${item.image_url}`
-                    : 'https://via.placeholder.com/400x300.png?text=No+Image'
-                }
+              item.image_url
+                ? `http://localhost:21917${item.image_url}`
+                : 'https://via.placeholder.com/400x300.png?text=No+Image'
+            }
                 alt={item.item_name}
                 style={cardImageStyle}
+                
                 onClick={() =>
-                  onImageClick(
-                    item.image_url ? `http://localhost:3000${item.image_url}` : null
-                  )
-                }
+              onImageClick(
+                item.image_url ? `http://localhost:21917${item.image_url}` : null
+              )
+            }
               />
               
               {isActive && (

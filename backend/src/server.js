@@ -63,7 +63,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes); // Upload Image route
-app.use('/api/uploads', express.static(path.join(__dirname, '/api/uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Error middleware
 app.use(notFound);
