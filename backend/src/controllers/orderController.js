@@ -30,7 +30,7 @@ export const createPosOrder = async (req, res) => {
         // ... (Step 2: Calculate totals is unchanged)
         let calculatedItemsTotal = 0; 
         for (const item of items) {
-            const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
+            const [rows] = await connection.query("SELECT price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
             calculatedItemsTotal += subtotal;
         }
@@ -41,7 +41,7 @@ export const createPosOrder = async (req, res) => {
         // --- CHANGE 1: 'Pending' changed to 'pending' ---
         // This fixes the NULL bug on creation.
         const orderSql = `
-            INSERT INTO orders 
+            INSERT INTO fb_orders 
             (customer_id, staff_id, order_type, delivery_location, status, items_total, service_charge_amount, vat_amount, total_amount) 
             VALUES (NULL, ?, ?, ?, 'pending', ?, ?, ?, ?)
         `;
@@ -58,10 +58,10 @@ export const createPosOrder = async (req, res) => {
 
         // ... (Step 4: Create order details is unchanged)
         for (const item of items) {
-            const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
+            const [rows] = await connection.query("SELECT price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
             const itemInstructions = item.instructions || instructions || '';
-            const detailSql = "INSERT INTO order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
+            const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, itemInstructions]);
         }
         
@@ -73,7 +73,7 @@ export const createPosOrder = async (req, res) => {
 
         // --- 7. UPDATE THE PAYMENT INSERTION ---
         const paymentSql =
-            "INSERT INTO payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
+            "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
         await connection.query(paymentSql, [
             order_id,
             payment_method || "Cash",
@@ -119,19 +119,19 @@ export const createOrder = async (req, res) => {
         
         // --- CHANGE 2: 'Pending' changed to 'pending' ---
         // This fixes the NULL bug on creation.
-        const orderSql = "INSERT INTO orders (customer_id, order_type, delivery_location, status) VALUES (?, ?, ?, 'pending')";
+        const orderSql = "INSERT INTO fb_orders (customer_id, order_type, delivery_location, status) VALUES (?, ?, ?, 'pending')";
         const [orderResult] = await connection.query(orderSql, [customer_id, order_type, delivery_location]);
         const order_id = orderResult.insertId;
 
         let calculatedItemsTotal = 0; 
         
         for (const item of items) {
-            const [rows] = await connection.query("SELECT price FROM menu_items WHERE item_id = ?", [item.item_id]);
+            const [rows] = await connection.query("SELECT price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
             const subtotal = rows[0].price * item.quantity;
             
             calculatedItemsTotal += subtotal;
             
-            const detailSql = "INSERT INTO order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
+            const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
         }
 
@@ -140,7 +140,7 @@ export const createOrder = async (req, res) => {
         const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
 
         const updateSql = `
-            UPDATE orders 
+            UPDATE fb_orders 
             SET 
                 items_total = ?, 
                 service_charge_amount = ?, 
@@ -188,7 +188,7 @@ export const getOrders = async (req, res) => {
                 o.*,
                 c.first_name,
                 c.last_name
-            FROM orders o
+            FROM fb_orders o
             LEFT JOIN customers c ON o.customer_id = c.customer_id
             ORDER BY o.order_date DESC
         `;
@@ -209,7 +209,7 @@ export const getOrderById = async (req, res) => {
     const { id } = req.params;
 
     const [orders] = await pool.query(
-        "SELECT *, items_total, service_charge_amount, vat_amount FROM orders WHERE order_id = ?", 
+        "SELECT *, items_total, service_charge_amount, vat_amount FROM fb_orders WHERE order_id = ?", 
         [id]
     );
     if (orders.length === 0) {
@@ -224,13 +224,13 @@ export const getOrderById = async (req, res) => {
         mi.price,
         od.instructions,
         od.order_detail_id AS detail_id
-    FROM order_details od 
-    JOIN menu_items mi ON od.item_id = mi.item_id 
+    FROM fb_order_details od 
+    JOIN fb_menu_items mi ON od.item_id = mi.item_id 
     WHERE od.order_id = ?`,
     [id]
     );
 
-    const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [id]);
+    const [payments] = await pool.query("SELECT * FROM fb_payments WHERE order_id = ?", [id]);
     const payment = payments[0] || {};
 
     res.json({
@@ -274,7 +274,7 @@ export const updateOrderStatus = async (req, res) => {
         await connection.beginTransaction();
 
         // Get current order status AND customer_id
-        const [orders] = await connection.query("SELECT status, customer_id FROM orders WHERE order_id = ? FOR UPDATE", [id]);
+        const [orders] = await connection.query("SELECT status, customer_id FROM fb_orders WHERE order_id = ? FOR UPDATE", [id]);
         if (orders.length === 0) {
             throw new Error("Order not found");
         }
@@ -288,7 +288,7 @@ export const updateOrderStatus = async (req, res) => {
         // --- BUSINESS LOGIC BLOCK ---
         if (newStatus === 'preparing' && currentStatus === 'pending') {
             console.log(`Deducting stock for order ${id}...`);
-            const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
+            const [details] = await connection.query("SELECT item_id, quantity FROM fb_order_details WHERE order_id = ?", [id]);
             
             await validateStock(details, connection);
             await adjustStock(details, 'deduct', connection);
@@ -297,13 +297,13 @@ export const updateOrderStatus = async (req, res) => {
 
         } else if (newStatus === 'cancelled') {
             if (currentStatus === 'preparing' || currentStatus === 'ready') {
-                const [payments] = await connection.query("SELECT * FROM payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
+                const [payments] = await connection.query("SELECT * FROM fb_payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
 
                 if (payments.length > 0) {
                     console.warn(`Order ${id} was already paid. Cancellation requested, but stock NOT restored automatically.`);
                 } else {
                     console.log(`Restoring ingredient stock for cancelled unpaid order: ${id}`);
-                    const [details] = await connection.query("SELECT item_id, quantity FROM order_details WHERE order_id = ?", [id]);
+                    const [details] = await connection.query("SELECT item_id, quantity FROM fb_order_details WHERE order_id = ?", [id]);
                     
                     await adjustStock(details, 'restore', connection);
                     await logOrderStockChange(id, details, 'ORDER_RESTORE', connection);
@@ -314,7 +314,7 @@ export const updateOrderStatus = async (req, res) => {
 
         // Update the order status and who updated it
         const [result] = await connection.query(
-            "UPDATE orders SET status = ?, staff_id = ? WHERE order_id = ?", 
+            "UPDATE fb_orders SET status = ?, staff_id = ? WHERE order_id = ?", 
             [newStatus, staff_id, id]
         );
 
@@ -349,7 +349,7 @@ export const getKitchenOrders = async (req, res) => {
     try {
         const sql = `
             SELECT o.*, c.first_name, c.last_name
-            FROM orders o
+            FROM fb_orders o
             LEFT JOIN customers c ON o.customer_id = c.customer_id
             WHERE o.status IN ('pending', 'preparing', 'ready')
             ORDER BY o.order_date ASC
@@ -371,7 +371,7 @@ export const getServedOrders = async (req, res) => {
     try {
         const sql = `
             SELECT o.*, c.first_name, c.last_name
-            FROM orders o
+            FROM fb_orders o
             LEFT JOIN customers c ON o.customer_id = c.customer_id
             WHERE o.status = 'served'
             ORDER BY o.order_date DESC
@@ -395,7 +395,7 @@ const createOrUpdateNotification = async (order_id, customer_id, status, connect
   try {
     // Step 1: Delete any existing notifications for this order.
     // This ensures the customer only sees the *latest* status.
-    const deleteSql = "DELETE FROM notifications WHERE order_id = ?";
+    const deleteSql = "DELETE FROM fb_notifications WHERE order_id = ?";
     await (connection || pool).query(deleteSql, [order_id]);
 
     // Step 2: Define the message based on the status.
@@ -427,7 +427,7 @@ const createOrUpdateNotification = async (order_id, customer_id, status, connect
 
     // Step 3: Insert the new notification. (It's unread by default)
     const insertSql = `
-      INSERT INTO notifications (customer_id, order_id, title, message, is_read)
+      INSERT INTO fb_notifications (customer_id, order_id, title, message, is_read)
       VALUES (?, ?, ?, ?, 0)
     `;
     await (connection || pool).query(insertSql, [customer_id, order_id, title, message]);

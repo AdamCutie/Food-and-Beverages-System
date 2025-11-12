@@ -2,7 +2,7 @@ import pool from "../config/mysql.js";
 
 // Helper function to create a log entry
 const createLog = async (ingredient_id, staff_id, action_type, quantity_change, new_stock_level, reason, connection) => {
-    const logSql = "INSERT INTO inventory_logs (ingredient_id, staff_id, action_type, quantity_change, new_stock_level, reason) VALUES (?, ?, ?, ?, ?, ?)";
+    const logSql = "INSERT INTO fb_inventory_logs (ingredient_id, staff_id, action_type, quantity_change, new_stock_level, reason) VALUES (?, ?, ?, ?, ?, ?)";
     await (connection || pool).query(logSql, [ingredient_id, staff_id, action_type, quantity_change, new_stock_level, reason || null]);
 };
 
@@ -11,7 +11,7 @@ const createLog = async (ingredient_id, staff_id, action_type, quantity_change, 
 // @access  Staff
 export const getAllIngredients = async (req, res) => {
     try {
-        const [ingredients] = await pool.query("SELECT * FROM ingredients ORDER BY name ASC");
+        const [ingredients] = await pool.query("SELECT * FROM fb_ingredients ORDER BY name ASC");
         res.json(ingredients);
     } catch (error) {
         res.status(500).json({ message: "Error fetching ingredients", error: error.message });
@@ -23,7 +23,7 @@ export const getAllIngredients = async (req, res) => {
 // @access  Staff
 export const getIngredientById = async (req, res) => {
     try {
-        const [ingredients] = await pool.query("SELECT * FROM ingredients WHERE ingredient_id = ?", [req.params.id]);
+        const [ingredients] = await pool.query("SELECT * FROM fb_ingredients WHERE ingredient_id = ?", [req.params.id]);
         if (ingredients.length === 0) {
             return res.status(404).json({ message: "Ingredient not found" });
         }
@@ -48,7 +48,7 @@ export const createIngredient = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const sql = "INSERT INTO ingredients (name, stock_level, unit_of_measurement) VALUES (?, ?, ?)";
+        const sql = "INSERT INTO fb_ingredients (name, stock_level, unit_of_measurement) VALUES (?, ?, ?)";
         const [result] = await connection.query(sql, [name, stock_level, unit_of_measurement]);
         const newIngredientId = result.insertId;
 
@@ -82,7 +82,7 @@ export const updateIngredientDetails = async (req, res) => {
     }
 
     try {
-        const sql = "UPDATE ingredients SET name = ?, unit_of_measurement = ? WHERE ingredient_id = ?";
+        const sql = "UPDATE fb_ingredients SET name = ?, unit_of_measurement = ? WHERE ingredient_id = ?";
         const [result] = await pool.query(sql, [name, unit_of_measurement, id]);
 
         if (result.affectedRows === 0) {
@@ -116,7 +116,7 @@ export const adjustIngredientStock = async (req, res) => {
         await connection.beginTransaction();
 
         // Lock the row for update
-        const [rows] = await connection.query("SELECT stock_level FROM ingredients WHERE ingredient_id = ? FOR UPDATE", [id]);
+        const [rows] = await connection.query("SELECT stock_level FROM fb_ingredients WHERE ingredient_id = ? FOR UPDATE", [id]);
         if (rows.length === 0) {
             await connection.rollback();
             return res.status(404).json({ message: "Ingredient not found" });
@@ -140,7 +140,7 @@ export const adjustIngredientStock = async (req, res) => {
         }
 
         // Update the stock
-        await connection.query("UPDATE ingredients SET stock_level = ? WHERE ingredient_id = ?", [newStockLevel, id]);
+        await connection.query("UPDATE fb_ingredients SET stock_level = ? WHERE ingredient_id = ?", [newStockLevel, id]);
 
         // Create the log entry
         await createLog(id, staff_id, action_type, parsedQty, newStockLevel, reason, connection);
@@ -163,7 +163,7 @@ export const deleteIngredient = async (req, res) => {
     // Note: Deleting an ingredient will fail if it's used in a recipe
     // due to the foreign key constraint, which is good!
     try {
-        const [result] = await pool.query("DELETE FROM ingredients WHERE ingredient_id = ?", [req.params.id]);
+        const [result] = await pool.query("DELETE FROM fb_ingredients WHERE ingredient_id = ?", [req.params.id]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "Ingredient not found" });
         }
@@ -185,16 +185,16 @@ export const getInventoryLogs = async (req, res) => {
         // This ensures that even if staff_id is NULL (for order logs),
         // the log entry is still returned.
         const sql = `
-            SELECT 
-                l.*, 
-                i.name as ingredient_name, 
-                COALESCE(CONCAT(s.first_name, ' ', s.last_name), 'System (Order)') as staff_name
-            FROM inventory_logs l
-            JOIN ingredients i ON l.ingredient_id = i.ingredient_id
-            LEFT JOIN staff s ON l.staff_id = s.staff_id
-            ORDER BY l.timestamp DESC
-            LIMIT 100
-        `;
+        SELECT 
+            l.*, 
+            i.name as ingredient_name, 
+            COALESCE(CONCAT(s.first_name, ' ', s.last_name), 'System (Order)') as staff_name
+        FROM fb_inventory_logs l
+        JOIN fb_ingredients i ON l.ingredient_id = i.ingredient_id
+        LEFT JOIN staff s ON l.staff_id = s.staff_id
+        ORDER BY l.timestamp DESC
+        LIMIT 100
+    `;
         const [logs] = await pool.query(sql);
         res.json(logs);
     } catch (error) {

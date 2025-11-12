@@ -7,20 +7,20 @@ export const getAllItems = async (req, res) => {
     try {
         // 1. Get all menu items with category
         const itemSql = `
-            SELECT 
-                mi.item_id, 
-                mi.item_name, 
-                c.name AS category, 
-                mi.price, 
-                mi.image_url, 
-                mi.description,
-                mi.category_id,
-                mi.is_promo,
-                mi.promo_discount_percentage,
-                mi.promo_expiry_date
-            FROM menu_items mi
-            LEFT JOIN categories c ON mi.category_id = c.category_id
-        `;
+        SELECT 
+            mi.item_id, 
+            mi.item_name, 
+            c.name AS category, 
+            mi.price, 
+            mi.image_url, 
+            mi.description,
+            mi.category_id,
+            mi.is_promo,
+            mi.promo_discount_percentage,
+            mi.promo_expiry_date
+        FROM fb_menu_items mi
+        LEFT JOIN fb_categories c ON mi.category_id = c.category_id
+    `;
         const [items] = await pool.query(itemSql);
         
         if (items.length === 0) {
@@ -31,15 +31,15 @@ export const getAllItems = async (req, res) => {
         // 2. Get all recipes
         const itemIds = items.map(item => item.item_id);
         const [recipes] = await pool.query(
-            `SELECT mi.menu_item_id, i.ingredient_id, mi.quantity_consumed
-             FROM menu_item_ingredients mi
-             JOIN ingredients i ON mi.ingredient_id = i.ingredient_id
-             WHERE mi.menu_item_id IN (?)`,
-            [itemIds]
+        `SELECT mi.menu_item_id, i.ingredient_id, mi.quantity_consumed
+         FROM fb_menu_item_ingredients mi
+         JOIN fb_ingredients i ON mi.ingredient_id = i.ingredient_id
+         WHERE mi.menu_item_id IN (?)`,
+        [itemIds]
         );
 
         // 3. Get all ingredient stock levels and put them in a Map for fast lookup
-        const [ingredients] = await pool.query("SELECT ingredient_id, stock_level FROM ingredients");
+        const [ingredients] = await pool.query("SELECT ingredient_id, stock_level FROM fb_ingredients");
         const stockMap = new Map(ingredients.map(ing => [ing.ingredient_id, parseFloat(ing.stock_level)]));
         // --- END OF NEW LOGIC ---
 
@@ -81,20 +81,20 @@ export const getItemById = async (req, res) => {
         const { id } = req.params;
         const sql = `
             SELECT 
-                mi.item_id, 
-                mi.item_name, 
-                c.name AS category, 
-                mi.price, 
-                mi.image_url, 
-                mi.description,
-                mi.category_id,
-                mi.is_promo,
-                mi.promo_discount_percentage,
-                mi.promo_expiry_date
-            FROM menu_items mi
-            LEFT JOIN categories c ON mi.category_id = c.category_id
-            WHERE mi.item_id = ?
-        `;
+            mi.item_id, 
+            mi.item_name, 
+            c.name AS category, 
+            mi.price, 
+            mi.image_url, 
+            mi.description,
+            mi.category_id,
+            mi.is_promo,
+            mi.promo_discount_percentage,
+            mi.promo_expiry_date
+        FROM fb_menu_items mi
+        LEFT JOIN fb_categories c ON mi.category_id = c.category_id
+        WHERE mi.item_id = ?
+    `;
         const [items] = await pool.query(sql, [id]);
         if (items.length === 0) {
             return res.status(404).json({ message: "Menu item not found" });
@@ -103,11 +103,11 @@ export const getItemById = async (req, res) => {
         const item = items[0];
 
         const [recipes] = await pool.query(
-            `SELECT mi.menu_item_id, i.ingredient_id, i.name, mi.quantity_consumed, i.unit_of_measurement
-             FROM menu_item_ingredients mi
-             JOIN ingredients i ON mi.ingredient_id = i.ingredient_id
-             WHERE mi.menu_item_id = ?`,
-            [id]
+        `SELECT mi.menu_item_id, i.ingredient_id, i.name, mi.quantity_consumed, i.unit_of_measurement
+         FROM fb_menu_item_ingredients mi
+         JOIN fb_ingredients i ON mi.ingredient_id = i.ingredient_id
+         WHERE mi.menu_item_id = ?`,
+        [id]
         );
         item.ingredients = recipes;
 
@@ -117,7 +117,7 @@ export const getItemById = async (req, res) => {
             item.is_available = false;
         } else {
             for (const recipeItem of recipes) {
-                const [stockRows] = await pool.query("SELECT stock_level FROM ingredients WHERE ingredient_id = ?", [recipeItem.ingredient_id]);
+                const [stockRows] = await pool.query("SELECT stock_level FROM fb_ingredients WHERE ingredient_id = ?", [recipeItem.ingredient_id]);
                 const availableStock = stockRows[0] ? parseFloat(stockRows[0].stock_level) : 0;
                 if (availableStock < recipeItem.quantity_consumed) {
                     item.is_available = false;
@@ -156,10 +156,10 @@ export const createMenuItem = async (req, res) => {
         await connection.beginTransaction();
 
         const sql = `
-            INSERT INTO menu_items 
-            (item_name, category_id, price, image_url, description, is_promo, promo_discount_percentage, promo_expiry_date) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `;
+        INSERT INTO fb_menu_items 
+        (item_name, category_id, price, image_url, description, is_promo, promo_discount_percentage, promo_expiry_date) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
         
         const [result] = await connection.query(sql, [
             item_name, 
@@ -173,13 +173,13 @@ export const createMenuItem = async (req, res) => {
         ]);
         const newItemId = result.insertId;
 
-        const recipeSql = "INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id, quantity_consumed) VALUES ?";
+        const recipeSql = "INSERT INTO fb_menu_item_ingredients (menu_item_id, ingredient_id, quantity_consumed) VALUES ?";
         const recipeValues = ingredients.map(ing => [newItemId, ing.ingredient_id, ing.quantity_consumed]);
         await connection.query(recipeSql, [recipeValues]);
         
         await connection.commit(); 
 
-        const [newItem] = await pool.query("SELECT * FROM menu_items WHERE item_id = ?", [newItemId]);
+        const [newItem] = await pool.query("SELECT * FROM fb_menu_items WHERE item_id = ?", [newItemId]);
         res.status(201).json(newItem[0]);
 
     } catch (error) {
@@ -215,11 +215,11 @@ export const updateMenuItem = async (req, res) => {
         await connection.beginTransaction();
 
         const sql = `
-            UPDATE menu_items 
-            SET item_name = ?, category_id = ?, price = ?, image_url = ?, description = ?,
-                is_promo = ?, promo_discount_percentage = ?, promo_expiry_date = ? 
-            WHERE item_id = ?
-        `;
+        UPDATE fb_menu_items 
+        SET item_name = ?, category_id = ?, price = ?, image_url = ?, description = ?,
+            is_promo = ?, promo_discount_percentage = ?, promo_expiry_date = ? 
+        WHERE item_id = ?
+       `;
         
         const [result] = await connection.query(sql, [
             item_name, 
@@ -238,15 +238,15 @@ export const updateMenuItem = async (req, res) => {
             return res.status(404).json({ message: 'Item not found' });
         }
 
-        await connection.query("DELETE FROM menu_item_ingredients WHERE menu_item_id = ?", [id]);
+        await connection.query("DELETE FROM fb_menu_item_ingredients WHERE menu_item_id = ?", [id]);
 
-        const recipeSql = "INSERT INTO menu_item_ingredients (menu_item_id, ingredient_id, quantity_consumed) VALUES ?";
+        const recipeSql = "INSERT INTO fb_menu_item_ingredients (menu_item_id, ingredient_id, quantity_consumed) VALUES ?";
         const recipeValues = ingredients.map(ing => [id, ing.ingredient_id, ing.quantity_consumed]);
         await connection.query(recipeSql, [recipeValues]);
 
         await connection.commit(); 
 
-        const [updatedItem] = await pool.query("SELECT * FROM menu_items WHERE item_id = ?", [id]);
+        const [updatedItem] = await pool.query("SELECT * FROM fb_menu_items WHERE item_id = ?", [id]);
         res.status(200).json(updatedItem[0]);
 
     } catch (error) {
@@ -264,7 +264,7 @@ export const updateMenuItem = async (req, res) => {
 export const deleteMenuItem = async (req, res) => {
   const { id } = req.params; 
   try {
-    const sql = "DELETE FROM menu_items WHERE item_id = ?";
+    const sql = "DELETE FROM fb_menu_items WHERE item_id = ?";
     const [result] = await pool.query(sql, [id]);
 
     if (result.affectedRows === 0) {
@@ -288,12 +288,12 @@ export const deleteMenuItem = async (req, res) => {
 export const validateStock = async (items, connection) => {
     for (const item of items) {
         const [recipe] = await connection.query(
-            "SELECT i.name, i.stock_level, mi.quantity_consumed FROM menu_item_ingredients mi JOIN ingredients i ON mi.ingredient_id = i.ingredient_id WHERE mi.menu_item_id = ?",
-            [item.item_id]
-        );
+        "SELECT i.name, i.stock_level, mi.quantity_consumed FROM fb_menu_item_ingredients mi JOIN fb_ingredients i ON mi.ingredient_id = i.ingredient_id WHERE mi.menu_item_id = ?",
+        [item.item_id]
+      );
 
         if (recipe.length === 0) {
-            const [menuItem] = await connection.query("SELECT item_name FROM menu_items WHERE item_id = ?", [item.item_id]);
+            const [menuItem] = await connection.query("SELECT item_name FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
             throw new Error(`Menu item '${menuItem[0].item_name}' (ID ${item.item_id}) has no ingredient recipe defined.`);
         }
 
@@ -317,13 +317,13 @@ export const adjustStock = async (items, operation, connection) => {
     
     for (const item of items) {
         const [recipe] = await connection.query(
-            "SELECT ingredient_id, quantity_consumed FROM menu_item_ingredients WHERE menu_item_id = ?",
+            "SELECT ingredient_id, quantity_consumed FROM fb_menu_item_ingredients WHERE menu_item_id = ?",
             [item.item_id]
         );
 
         for (const ing of recipe) {
             const stockChange = ing.quantity_consumed * item.quantity;
-            const stockSql = `UPDATE ingredients SET stock_level = stock_level ${operator} ? WHERE ingredient_id = ?`;
+            const stockSql = `UPDATE fb_ingredients SET stock_level = stock_level ${operator} ? WHERE ingredient_id = ?`;
             await connection.query(stockSql, [stockChange, ing.ingredient_id]);
         }
     }
@@ -341,7 +341,7 @@ export const logOrderStockChange = async (order_id, items, action_type, connecti
     for (const item of items) {
       // 1. Get the recipe
       const [recipe] = await connection.query(
-        "SELECT ingredient_id, quantity_consumed FROM menu_item_ingredients WHERE menu_item_id = ?",
+        "SELECT ingredient_id, quantity_consumed FROM fb_menu_item_ingredients WHERE menu_item_id = ?",
         [item.item_id]
       );
 
@@ -350,13 +350,13 @@ export const logOrderStockChange = async (order_id, items, action_type, connecti
         
         // 2. Get the new stock level (AFTER the change was made)
         const [stockRows] = await connection.query(
-          "SELECT stock_level FROM ingredients WHERE ingredient_id = ?",
+          "SELECT stock_level FROM fb_ingredients WHERE ingredient_id = ?",
           [ing.ingredient_id]
         );
         const new_stock_level = stockRows[0].stock_level;
 
         // 3. Create the log
-        const logSql = "INSERT INTO inventory_logs (ingredient_id, staff_id, action_type, quantity_change, new_stock_level, reason) VALUES (?, ?, ?, ?, ?, ?)";
+        const logSql = "INSERT INTO fb_inventory_logs (ingredient_id, staff_id, action_type, quantity_change, new_stock_level, reason) VALUES (?, ?, ?, ?, ?, ?)";
         const reason = `Order ID: ${order_id}`;
         // We pass NULL for staff_id because this is a system (customer) action
         await connection.query(logSql, [ing.ingredient_id, null, action_type, quantity_change, new_stock_level, reason]);

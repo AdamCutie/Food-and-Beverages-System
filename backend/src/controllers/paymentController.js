@@ -13,7 +13,7 @@ export const createPayMongoPayment = async (req, res) => {
 
         // 1. Get order details
         const [order] = await pool.query(
-            "SELECT * FROM orders WHERE order_id = ? AND customer_id = ?", 
+            "SELECT * FROM fb_orders WHERE order_id = ? AND customer_id = ?", 
             [order_id, customer_id]
         );
         
@@ -31,8 +31,8 @@ export const createPayMongoPayment = async (req, res) => {
         // We must fetch all items from `order_details` and join with `menu_items` to get names and prices.
         const [orderItems] = await pool.query(
             `SELECT od.quantity, mi.item_name, mi.price 
-             FROM order_details od
-             JOIN menu_items mi ON od.item_id = mi.item_id
+             FROM fb_order_details od
+             JOIN fb_menu_items mi ON od.item_id = mi.item_id
              WHERE od.order_id = ?`,
             [order_id]
         );
@@ -177,7 +177,7 @@ export const paymongoWebhook = async (req, res) => {
 
             // Check if payment already recorded
             const [existingPayment] = await connection.query(
-                "SELECT * FROM payments WHERE paymongo_payment_id = ?",
+                "SELECT * FROM fb_payments WHERE paymongo_payment_id = ?",
                 [paymentData.id]
             );
 
@@ -189,7 +189,7 @@ export const paymongoWebhook = async (req, res) => {
 
             // Record the payment
             const paymentSql = `
-                INSERT INTO payments 
+                INSERT INTO fb_payments 
                 (order_id, payment_method, amount, payment_status, paymongo_payment_id, payment_date) 
                 VALUES (?, ?, ?, 'paid', ?, NOW())
             `;
@@ -202,7 +202,7 @@ export const paymongoWebhook = async (req, res) => {
 
             // Update order status to paid
             await connection.query(
-                "UPDATE orders SET status = 'pending' WHERE order_id = ?",
+                "UPDATE fb_orders SET status = 'pending' WHERE order_id = ?",
                 [order_id]
             );
 
@@ -218,7 +218,7 @@ export const paymongoWebhook = async (req, res) => {
 
             if (order_id) {
                 await pool.query(
-                    "UPDATE orders SET status = 'cancelled' WHERE order_id = ?",
+                    "UPDATE fb_orders SET status = 'cancelled' WHERE order_id = ?",
                     [order_id]
                 );
                 console.log(`❌ Payment failed for Order #${order_id}`);
@@ -253,11 +253,11 @@ export const recordPayment = async (req, res) => {
             return res.status(400).json({ message: "Order ID and amount paid are required."});
         }
 
-        const paymentSql = "INSERT INTO payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
+        const paymentSql = "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
         const [paymentResult] = await connection.query(paymentSql, [order_id, payment_method, amount, change_amount || 0]);
 
         // Update order status to paid
-        await connection.query("UPDATE orders SET status = 'paid' WHERE order_id = ?", [order_id]);
+        await connection.query("UPDATE fb_orders SET status = 'paid' WHERE order_id = ?", [order_id]);
 
         await connection.commit();
 
@@ -280,9 +280,9 @@ export const recordPayment = async (req, res) => {
 export const getPaymentsForOrder = async (req, res) => {
     try {
         const { order_id } = req.params;
-        const [payments] = await pool.query("SELECT * FROM payments WHERE order_id = ?", [order_id]);
+        const [payments] = await pool.query("SELECT * FROM fb_payments WHERE order_id = ?", [order_id]);
         res.json(payments);
     } catch (error) {
-        res.status(500).json({ message: "Error fetching payments", error: error.message });
+        res.status(500).json({ message: "Error fetching fb_payments", error: error.message });
     }
 };

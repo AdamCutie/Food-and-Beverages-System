@@ -9,7 +9,7 @@ export const getMyNotifications = async (req, res) => {
 
     // First, get the list of all notifications
     const [notifications] = await pool.query(
-      `SELECT * FROM notifications 
+      `SELECT * FROM fb_notifications 
        WHERE customer_id = ? 
        ORDER BY created_at DESC`,
       [customer_id]
@@ -18,7 +18,7 @@ export const getMyNotifications = async (req, res) => {
     // Second, get the count of *only* the unread ones
     const [countResult] = await pool.query(
       `SELECT COUNT(*) as unreadCount 
-       FROM notifications 
+       FROM fb_notifications 
        WHERE customer_id = ? AND is_read = 0`,
       [customer_id]
     );
@@ -46,7 +46,7 @@ export const markNotificationsAsRead = async (req, res) => {
 
     // Update all unread (is_read = 0) notifications to read (is_read = 1)
     const sql = `
-      UPDATE notifications 
+      UPDATE fb_notifications 
       SET is_read = 1 
       WHERE customer_id = ? AND is_read = 0
     `;
@@ -70,7 +70,7 @@ export const deleteNotificationById = async (req, res) => {
     const customer_id = req.user.id; // From 'protect' middleware
     const { id: notification_id } = req.params; // Get ID from URL
 
-    const sql = "DELETE FROM notifications WHERE notification_id = ? AND customer_id = ?";
+    const sql = "DELETE FROM fb_notifications WHERE notification_id = ? AND customer_id = ?";
     const [result] = await pool.query(sql, [notification_id, customer_id]);
 
     if (result.affectedRows === 0) {
@@ -93,7 +93,7 @@ export const clearAllNotifications = async (req, res) => {
   try {
     const customer_id = req.user.id; // From 'protect' middleware
 
-    const sql = "DELETE FROM notifications WHERE customer_id = ?";
+    const sql = "DELETE FROM fb_notifications WHERE customer_id = ?";
     await pool.query(sql, [customer_id]);
 
     res.json({ message: "All notifications cleared" });
