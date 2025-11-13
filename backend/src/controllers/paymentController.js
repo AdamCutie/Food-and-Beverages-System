@@ -7,14 +7,14 @@ import crypto from "crypto";
 export const createPayMongoPayment = async (req, res) => {
     try {
         const { order_id } = req.params;
-        const customer_id = req.user.id;
+        const client_id = req.user.id;
 
         console.log('Creating PayMongo payment for order:', order_id);
 
         // 1. Get order details
         const [order] = await pool.query(
-            "SELECT * FROM fb_orders WHERE order_id = ? AND customer_id = ?", 
-            [order_id, customer_id]
+            "SELECT * FROM fb_orders WHERE order_id = ? AND client_id = ?", 
+            [order_id, client_id]
         );
         
         if (order.length === 0) {
@@ -94,7 +94,7 @@ export const createPayMongoPayment = async (req, res) => {
                         remarks: `Food & Beverages - Order ${order_id}`,
                         metadata: {
                             order_id: order_id.toString(),
-                            customer_id: customer_id.toString()
+                            client_id: client_id.toString()
                         }
                     }
                 }

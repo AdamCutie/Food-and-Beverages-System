@@ -5,22 +5,22 @@ import pool from "../config/mysql.js";
 // @access  Private (Customer)
 export const getMyNotifications = async (req, res) => {
   try {
-    const customer_id = req.user.id; // From 'protect' middleware
+    const client_id = req.user.id; // From 'protect' middleware
 
     // First, get the list of all notifications
     const [notifications] = await pool.query(
       `SELECT * FROM fb_notifications 
-       WHERE customer_id = ? 
+       WHERE client_id = ? 
        ORDER BY created_at DESC`,
-      [customer_id]
+      [client_id]
     );
 
     // Second, get the count of *only* the unread ones
     const [countResult] = await pool.query(
       `SELECT COUNT(*) as unreadCount 
        FROM fb_notifications 
-       WHERE customer_id = ? AND is_read = 0`,
-      [customer_id]
+       WHERE client_id = ? AND is_read = 0`,
+      [client_id]
     );
 
     const unreadCount = countResult[0].unreadCount || 0;
@@ -42,16 +42,16 @@ export const getMyNotifications = async (req, res) => {
 // @access  Private (Customer)
 export const markNotificationsAsRead = async (req, res) => {
   try {
-    const customer_id = req.user.id; // From 'protect' middleware
+    const client_id = req.user.id; // From 'protect' middleware
 
     // Update all unread (is_read = 0) notifications to read (is_read = 1)
     const sql = `
       UPDATE fb_notifications 
       SET is_read = 1 
-      WHERE customer_id = ? AND is_read = 0
+      WHERE client_id = ? AND is_read = 0
     `;
     
-    await pool.query(sql, [customer_id]);
+    await pool.query(sql, [client_id]);
 
     res.json({ message: "Notifications marked as read" });
 
@@ -67,11 +67,11 @@ export const markNotificationsAsRead = async (req, res) => {
 // @access  Private (Customer)
 export const deleteNotificationById = async (req, res) => {
   try {
-    const customer_id = req.user.id; // From 'protect' middleware
+    const client_id = req.user.id; // From 'protect' middleware
     const { id: notification_id } = req.params; // Get ID from URL
 
-    const sql = "DELETE FROM fb_notifications WHERE notification_id = ? AND customer_id = ?";
-    const [result] = await pool.query(sql, [notification_id, customer_id]);
+    const sql = "DELETE FROM fb_notifications WHERE notification_id = ? AND client_id = ?";
+    const [result] = await pool.query(sql, [notification_id, client_id]);
 
     if (result.affectedRows === 0) {
       // This means the notification either didn't exist or didn't belong to this user
@@ -91,10 +91,10 @@ export const deleteNotificationById = async (req, res) => {
 // @access  Private (Customer)
 export const clearAllNotifications = async (req, res) => {
   try {
-    const customer_id = req.user.id; // From 'protect' middleware
+    const client_id = req.user.id; // From 'protect' middleware
 
-    const sql = "DELETE FROM fb_notifications WHERE customer_id = ?";
-    await pool.query(sql, [customer_id]);
+    const sql = "DELETE FROM fb_notifications WHERE client_id = ?";
+    await pool.query(sql, [client_id]);
 
     res.json({ message: "All notifications cleared" });
   } catch (error) {
