@@ -31,37 +31,37 @@ export const getDashboardAnalytics = async (req, res) => {
       // Today
       runQuery(
         `SELECT 
-          COUNT(order_id) AS orders, 
+          COUNT(order_id) AS fb_orders, 
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
-        FROM orders 
+        FROM fb_orders 
         WHERE DATE(order_date) = CURDATE() AND status != 'Cancelled'`
       ),
       // Yesterday
       runQuery(
         `SELECT 
-          COUNT(order_id) AS orders, 
+          COUNT(order_id) AS fb_orders, 
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
-        FROM orders 
+        FROM fb_orders 
         WHERE DATE(order_date) = CURDATE() - INTERVAL 1 DAY AND status != 'Cancelled'`
       ),
       // This Week (starting Monday)
       runQuery(
         `SELECT 
-          COUNT(order_id) AS orders, 
+          COUNT(order_id) AS fb_orders, 
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
-        FROM orders 
+        FROM fb_orders 
         WHERE YEARWEEK(order_date, 1) = YEARWEEK(NOW(), 1) AND status != 'Cancelled'`
       ),
       // This Month
       runQuery(
         `SELECT 
-          COUNT(order_id) AS orders, 
+          COUNT(order_id) AS fb_orders, 
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
-        FROM orders 
+        FROM fb_orders 
         WHERE YEAR(order_date) = YEAR(NOW()) AND MONTH(order_date) = MONTH(NOW()) AND status != 'Cancelled'`
       ),
 
@@ -72,9 +72,9 @@ export const getDashboardAnalytics = async (req, res) => {
           mi.item_name, 
           SUM(od.quantity) AS total_sold, 
           SUM(od.subtotal) AS total_sales 
-        FROM order_details od
-        JOIN menu_items mi ON od.item_id = mi.item_id
-        JOIN orders o ON od.order_id = o.order_id
+        FROM fb_order_details od
+        JOIN fb_menu_items mi ON od.item_id = mi.item_id
+        JOIN fb_orders o ON od.order_id = o.order_id
         WHERE o.status != 'Cancelled'
         GROUP BY od.item_id, mi.item_name
         ORDER BY total_sales DESC
@@ -88,7 +88,7 @@ export const getDashboardAnalytics = async (req, res) => {
           payment_method, 
           COUNT(payment_id) AS transactions, 
           SUM(amount) AS total_value 
-        FROM payments 
+        FROM fb_payments 
         WHERE payment_status = 'paid'
         GROUP BY payment_method`
       ),
@@ -97,9 +97,9 @@ export const getDashboardAnalytics = async (req, res) => {
       runQuery(
         `SELECT 
           order_type, 
-          COUNT(order_id) AS orders, 
+          COUNT(order_id) AS fb_orders, 
           SUM(total_amount) AS total_value 
-        FROM orders 
+        FROM fb_orders 
         WHERE status != 'Cancelled'
         GROUP BY order_type`
       ),
@@ -109,7 +109,7 @@ export const getDashboardAnalytics = async (req, res) => {
         `SELECT 
           HOUR(order_date) AS hour, 
           COUNT(order_id) AS order_count 
-        FROM orders 
+        FROM fb_orders 
         WHERE status != 'Cancelled'
         GROUP BY hour 
         ORDER BY order_count DESC 
