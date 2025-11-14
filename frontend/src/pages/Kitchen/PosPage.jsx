@@ -8,6 +8,7 @@ import PosCart from './components/PosCart'; // --- IMPORT OUR NEW CART ---
 import toast from 'react-hot-toast';
 import apiClient from '../../utils/apiClient';
 import PosPaymentModal from './components/PosPaymentModal';
+import { Search } from 'lucide-react';
 
 function PosPage() {
   const [items, setItems] = useState([]);
@@ -230,8 +231,21 @@ const handleOpenPaymentModal = (grandTotal) => {
       <InternalNavBar />
       <div className="flex flex-1 overflow-hidden">
         
-        {/* Main Content (Menu) */}
         <main className="flex-1 overflow-y-auto p-8">
+
+          <div className="relative w-full max-w-lg mx-auto mb-6">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="text-gray-400" size={20} />
+            </div>
+            <input
+              type="text"
+              placeholder="Search for food..."
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#F9A825]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
           <CategoryTabs
             categories={categories}
             selectedCategory={selectedCategory}
@@ -247,12 +261,12 @@ const handleOpenPaymentModal = (grandTotal) => {
         />
         </main>
 
-        {/* Fixed Cart (Right Side) */}
+ 
         <aside className="w-96 border-l border-gray-200 overflow-y-auto h-full">
           <PosCart
             cartItems={cartItems}
             onUpdateQuantity={handleUpdateQuantity}
-            onPlaceOrder={handleOpenPaymentModal} // --- CHANGED
+            onPlaceOrder={handleOpenPaymentModal}
             orderType={orderType}
             setOrderType={setOrderType}
             instructions={instructions}
