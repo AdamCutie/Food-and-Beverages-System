@@ -211,8 +211,14 @@ export const getOrderById = async (req, res) => {
     const { id } = req.params;
 
     const [orders] = await pool.query(
-        "SELECT *, items_total, service_charge_amount, vat_amount FROM fb_orders WHERE order_id = ?", 
-        [id]
+      `SELECT 
+         o.*, 
+         c.first_name, 
+         c.last_name
+       FROM fb_orders o
+       LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
+       WHERE o.order_id = ?`,
+      [id]
     );
     if (orders.length === 0) {
       return res.status(404).json({ message: "Order not found" });
@@ -240,6 +246,8 @@ export const getOrderById = async (req, res) => {
       order_date: order.order_date,
       order_type: order.order_type,
       delivery_location: order.delivery_location,
+      first_name: order.first_name,
+      last_name: order.last_name,
       items_total: order.items_total,
       service_charge_amount: order.service_charge_amount,
       vat_amount: order.vat_amount,
