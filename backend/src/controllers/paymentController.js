@@ -30,7 +30,13 @@ export const createPayMongoPayment = async (req, res) => {
         // 2. --- NEW --- Get the individual line items for the order
         // We must fetch all items from `order_details` and join with `menu_items` to get names and prices.
         const [orderItems] = await pool.query(
-            `SELECT od.quantity, mi.item_name, mi.price 
+            `SELECT 
+                od.quantity, 
+                mi.item_name, 
+                mi.price, 
+                mi.is_promo, 
+                mi.promo_discount_percentage, 
+                mi.promo_expiry_date
              FROM fb_order_details od
              JOIN fb_menu_items mi ON od.item_id = mi.item_id
              WHERE od.order_id = ?`,
@@ -41,14 +47,30 @@ export const createPayMongoPayment = async (req, res) => {
             return res.status(404).json({ message: "No items found for this order" });
         }
 
-        // 3. --- NEW --- Format line_items for PayMongo
-        // We must map our database rows into the array format PayMongo requires.
-        const line_items = orderItems.map(item => ({
-            name: item.item_name,
-            quantity: item.quantity,
-            amount: Math.round(parseFloat(item.price) * 100), // Price per item in cents
-            currency: 'PHP' // Currency must be specified per item
-        }));
+        // 4. Manually calculate the discounted price for EACH item
+        const line_items = orderItems.map(item => {
+            let actualPrice = parseFloat(item.price); // Start with original price
+
+            // Check if promo is active and valid
+            if (item.is_promo && item.promo_discount_percentage && item.promo_expiry_date) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); 
+                const expiryDate = new Date(item.promo_expiry_date);
+                
+                if (expiryDate >= today) { // If promo is not expired
+                    const discount = parseFloat(item.promo_discount_percentage) / 100;
+                    actualPrice = actualPrice * (1 - discount); // Apply the discount!
+                }
+            }
+
+            // Use the new 'actualPrice' for the PayMongo line item amount
+            return {
+                name: item.item_name,
+                quantity: item.quantity,
+                amount: Math.round(actualPrice * 100), // Price in cents
+                currency: 'PHP'
+            };
+        });
 
         // Validate PayMongo API key
         if (!process.env.PAYMONGO_SECRET_KEY || !process.env.FRONTEND_URL) {

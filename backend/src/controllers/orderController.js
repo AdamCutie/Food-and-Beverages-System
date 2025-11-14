@@ -10,6 +10,7 @@ const VAT_RATE = 0.12;     // 12%
 // @access  Private (Staff)
 export const createPosOrder = async (req, res) => {
     const connection = await pool.getConnection();
+    let order_id;
     try {
         await connection.beginTransaction();
 
@@ -31,10 +32,35 @@ export const createPosOrder = async (req, res) => {
         // ... (Step 2: Calculate totals is unchanged)
         let calculatedItemsTotal = 0; 
         for (const item of items) {
-            const [rows] = await connection.query("SELECT price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
-            const subtotal = rows[0].price * item.quantity;
+            // 1. Fetch the item's price AND promo details
+            const [rows] = await connection.query(
+                "SELECT price, is_promo, promo_discount_percentage, promo_expiry_date FROM fb_menu_items WHERE item_id = ?", 
+                [item.item_id]
+            );
+
+            const dbItem = rows[0];
+            let actualPrice = parseFloat(dbItem.price); // Start with the original price
+
+            // 2. Check if the promo is active and valid
+            if (dbItem.is_promo && dbItem.promo_discount_percentage && dbItem.promo_expiry_date) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); 
+                const expiryDate = new Date(dbItem.promo_expiry_date);
+                
+                if (expiryDate >= today) { // If promo is not expired
+                    const discount = parseFloat(dbItem.promo_discount_percentage) / 100;
+                    actualPrice = actualPrice * (1 - discount); // Apply the discount!
+                }
+            }
+            
+            // 3. Use the new 'actualPrice' for all calculations
+            const subtotal = actualPrice * item.quantity;
             calculatedItemsTotal += subtotal;
+            
+            const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
+            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
         }
+
         const calculatedServiceCharge = calculatedItemsTotal * SERVICE_RATE;
         const calculatedVatAmount = (calculatedItemsTotal + calculatedServiceCharge) * VAT_RATE; 
         const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
@@ -56,7 +82,7 @@ export const createPosOrder = async (req, res) => {
             calculatedVatAmount,
             calculatedTotalAmount
         ]);
-        const order_id = orderResult.insertId;
+        order_id = orderResult.insertId;
 
         // ... (Step 4: Create order details is unchanged)
         for (const item of items) {
@@ -79,8 +105,8 @@ export const createPosOrder = async (req, res) => {
         await connection.query(paymentSql, [
             order_id,
             payment_method || "Cash",
-            amount_tendered, // This is the amount the customer handed over
-            change_amount    // This is the change we calculated
+            calculatedTotalAmount, // <-- THIS IS THE FIX
+            change_amount
         ]);
         // --- END OF UPDATE ---
 
@@ -128,9 +154,29 @@ export const createOrder = async (req, res) => {
         let calculatedItemsTotal = 0; 
         
         for (const item of items) {
-            const [rows] = await connection.query("SELECT price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
-            const subtotal = rows[0].price * item.quantity;
+            // 1. Fetch the item's price AND promo details
+            const [rows] = await connection.query(
+                "SELECT price, is_promo, promo_discount_percentage, promo_expiry_date FROM fb_menu_items WHERE item_id = ?", 
+                [item.item_id]
+            );
+
+            const dbItem = rows[0];
+            let actualPrice = parseFloat(dbItem.price); // Start with the original price
+
+            // 2. Check if the promo is active and valid
+            if (dbItem.is_promo && dbItem.promo_discount_percentage && dbItem.promo_expiry_date) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); 
+                const expiryDate = new Date(dbItem.promo_expiry_date);
+                
+                if (expiryDate >= today) { // If promo is not expired
+                    const discount = parseFloat(dbItem.promo_discount_percentage) / 100;
+                    actualPrice = actualPrice * (1 - discount); // Apply the discount!
+                }
+            }
             
+            // 3. Use the new 'actualPrice' for all calculations
+            const subtotal = actualPrice * item.quantity;
             calculatedItemsTotal += subtotal;
             
             const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
