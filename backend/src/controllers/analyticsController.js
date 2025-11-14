@@ -97,7 +97,7 @@ export const getDashboardAnalytics = async (req, res) => {
       runQuery(
         `SELECT 
           order_type, 
-          COUNT(order_id) AS fb_orders, 
+          COUNT(order_id) AS orders, 
           SUM(total_amount) AS total_value 
         FROM fb_orders 
         WHERE status != 'Cancelled'
