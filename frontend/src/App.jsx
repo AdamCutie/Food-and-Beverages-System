@@ -72,7 +72,7 @@ function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['admin', 'employee']}>
               <AdminPage />
             </ProtectedRoute>
           }
@@ -80,7 +80,7 @@ function App() {
         <Route
           path="/kitchen"
           element={
-            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier']}>
+            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier','employee']}>
               <KitchenPage />
             </ProtectedRoute>
           }
@@ -90,7 +90,7 @@ function App() {
         <Route
           path="/kitchen/pos"
           element={
-            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier']}>
+            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier', 'employee']}>
               <PosPage />
             </ProtectedRoute>
           }
@@ -99,7 +99,7 @@ function App() {
         <Route
           path="/kitchen/inventory"
           element={
-            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier']}>
+            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier', 'employee']}>
               <InventoryPage />
             </ProtectedRoute>
           }
@@ -108,7 +108,7 @@ function App() {
         <Route
           path="/kitchen/archive"
           element={
-            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier']}>
+            <ProtectedRoute allowedRoles={['admin', 'waiter', 'cashier','employee']}>
               <ArchivePage />
             </ProtectedRoute>
           }

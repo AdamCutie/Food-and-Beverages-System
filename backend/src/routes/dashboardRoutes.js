@@ -12,7 +12,7 @@ const router = express.Router();
  * @desc    Get all dashboard summary data in one request
  * @access  Private (Admin)
  */
-router.get("/summary", protect, authorizeRoles("admin"), getDashboardSummary);
+router.get("/summary", protect, authorizeRoles("admin","employee"), getDashboardSummary);
 
 // ALL OTHER ROUTES ARE REMOVED.
 // This fixes the 'ReferenceError' crash because
