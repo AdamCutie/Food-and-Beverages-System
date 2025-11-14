@@ -31,7 +31,7 @@ const PosCart = ({
     <div className="p-6 flex flex-col h-full bg-white shadow-lg">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">New Order</h2>
+        <h2 className="text-2xl font-bold text-[#3C2A21]">New Order</h2>
       </div>
 
       {/* Order Type Buttons */}
@@ -42,8 +42,8 @@ const PosCart = ({
             setDeliveryLocation('Counter');
           }}
           className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
-            orderType === 'Walk-in' ? 'bg-green-900 text-white' : 'bg-gray-200 text-gray-700'
-          }`}
+          orderType === 'Walk-in' ? 'bg-[#F9A825] text-[#3C2A21]' : 'bg-gray-200 text-gray-700'
+         }`}
         >
           Walk-in
         </button>
@@ -53,15 +53,15 @@ const PosCart = ({
             setDeliveryLocation('');
           }}
           className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
-            orderType === 'Phone Order' ? 'bg-green-900 text-white' : 'bg-gray-200 text-gray-700'
-          }`}
+        orderType === 'Phone Order' ? 'bg-[#F9A825] text-[#3C2A21]' : 'bg-gray-200 text-gray-700'
+      }`}
         >
           Phone Order
         </button>
       </div>
 
       {/* Delivery Location Input */}
-      <div className="mb-4">
+      <div className="mb-4 text-[#3C2A21]">
         <label htmlFor="delivery_location" className="text-sm font-semibold text-gray-700">
           {orderType === 'Walk-in' ? 'Customer Name' : 'Phone/Notes'}
         </label>
@@ -79,7 +79,7 @@ const PosCart = ({
       {/* Cart Items List */}
       <div className="flex-1 overflow-y-auto pr-2 mb-4 border-t border-b py-4">
         {cartItems.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">Cart is empty.</p>
+          <p className="text-white text-center py-8">Cart is empty.</p>
         ) : (
           <div className="space-y-4">
             {cartItems.map((item) => (
@@ -104,33 +104,33 @@ const PosCart = ({
       <div>
         {/* Instructions */}
         <div className="mt-4">
-          <label htmlFor="instructions" className="text-sm font-semibold text-gray-700">Special Instructions</label>
+          <label htmlFor="instructions" className="text-sm font-semibold text-white">Special Instructions</label>
           <textarea id="instructions" value={instructions} onChange={(e) => setInstructions(e.target.value)} rows="3" className="mt-1 w-full border border-gray-300 rounded-md p-2" placeholder="e.g. allergies, extra spicy, etc."></textarea>
         </div>
 
         {/* Footer with DISPLAY-ONLY calculations */}
         <div className="border-t pt-4 mt-4 space-y-2">
-          <div className="flex justify-between text-sm text-gray-600">
+          <div className="flex justify-between text-sm text-[#3C2A21]">
             <span>Subtotal</span>
             <span>₱{subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm text-gray-600">
+          <div className="flex justify-between text-sm text-[#3C2A21]">
             <span>Service Charge ({ (SERVICE_RATE * 100).toFixed(0) }%)</span>
             <span>₱{serviceAmount.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-sm text-gray-600">
+          <div className="flex justify-between text-sm text-[#3C2A21]">
             <span>VAT ({ (VAT_RATE * 100).toFixed(0) }%)</span>
             <span>₱{vatAmount.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between font-bold text-lg pt-2 border-t mt-2">
+          <div className="flex justify-between text-[#3C2A21] font-bold text-lg pt-2 border-t mt-2">
             <span>Total amount</span>
             <span>₱{grandTotal.toFixed(2)}</span>
           </div>
          <button
-            onClick={() => onPlaceOrder(grandTotal)} // Pass the total to the handler
-            disabled={cartItems.length === 0 || !deliveryLocation} // Remove isPlacingOrder
-            className="w-full mt-4 bg-green-900 text-white font-bold py-3 rounded-lg hover:bg-green-800 transition-colors disabled:bg-gray-400"
-          >
+        onClick={() => onPlaceOrder(grandTotal)} // Pass the total to the handler
+        disabled={cartItems.length === 0 || !deliveryLocation} // Remove isPlacingOrder
+        className="w-full mt-4 bg-[#F9A825] text-[#3C2A21] font-bold py-3 rounded-lg hover:bg-[#c47b04] transition-colors disabled:bg-gray-400"
+        >
             Submit Cash Order
           </button>
         </div>
