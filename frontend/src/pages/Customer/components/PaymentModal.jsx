@@ -41,7 +41,7 @@ const PaymentModal = ({
         <div className="mb-6">
           <h3 className="text-lg font-semibold mb-3 text-gray-800">Payment Method</h3>
           <div className="space-y-3">
-            {['GCash', 'Debit Card', 'Credit Card'].map((method) => (
+            {['Online'].map((method) => (
               <label key={method} className="flex items-center space-x-3 p-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
                 <input
                   type="radio"
@@ -52,9 +52,7 @@ const PaymentModal = ({
                   className="form-radio h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                 />
                 <span className="text-sm font-medium text-gray-700">{method}</span>
-                {method === 'GCash' && <span className="text-xs text-gray-500">- Mobile wallet payment - instant confirmation</span>}
-                {method === 'Debit Card' && <span className="text-xs text-gray-500">- Visa, Mastercard, BancNet, Megalink</span>}
-                {method === 'Credit Card' && <span className="text-xs text-gray-500">- Visa, Mastercard, JCB, American Express</span>}
+                {method === 'Online' && <span className="text-xs text-gray-500">- Mobile wallet payment - instant confirmation</span>}
               </label>
             ))}
           </div>
