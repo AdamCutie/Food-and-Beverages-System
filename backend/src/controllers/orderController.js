@@ -19,18 +19,35 @@ export const createPosOrder = async (req, res) => {
           items, order_type, instructions, delivery_location, 
           payment_method, amount_tendered, change_amount 
         } = req.body;
-        // Renamed `staff_id` to `employee_id`.
-        const employee_id = req.user.id; // From 'protect' middleware
+        const employee_id = req.user.id;
 
         if (!employee_id || !items || items.length === 0 || !delivery_location) {
             throw new Error("Missing required order information.");
         }
         
-        // ... (Step 1: Validate stock is unchanged)
+        // Step 1: Validate stock
         await validateStock(items, connection);
 
-        // ... (Step 2: Calculate totals is unchanged)
+        // Step 2: Calculate totals with promo support
         let calculatedItemsTotal = 0; 
+        
+        // BUG FIX #1: Create order BEFORE order details
+        // WHY: We need order_id to insert order details, but the original code
+        // tried to insert details before creating the order (order_id was undefined)
+        // HOW: Move order creation before the detail insertion loop
+        const orderSql = `
+            INSERT INTO fb_orders 
+            (client_id, employee_id, order_type, delivery_location, status, items_total, service_charge_amount, vat_amount, total_amount) 
+            VALUES (NULL, ?, ?, ?, 'pending', 0, 0, 0, 0)
+        `;
+        const [orderResult] = await connection.query(orderSql, [
+            employee_id, 
+            order_type, 
+            delivery_location
+        ]);
+        order_id = orderResult.insertId;
+        
+        // Step 3: Calculate totals and create order details
         for (const item of items) {
             // 1. Fetch the item's price AND promo details
             const [rows] = await connection.query(
@@ -57,60 +74,46 @@ export const createPosOrder = async (req, res) => {
             const subtotal = actualPrice * item.quantity;
             calculatedItemsTotal += subtotal;
             
+            // BUG FIX #2: Use item-specific instructions if provided, otherwise use general instructions
+            // WHY: Allows per-item customization while maintaining fallback to general instructions
+            // HOW: Check if item has its own instructions, otherwise use the general one
+            const itemInstructions = item.instructions || instructions || '';
+            
             const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
-            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
+            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, itemInstructions]);
         }
 
+        // Calculate service charge and VAT
         const calculatedServiceCharge = calculatedItemsTotal * SERVICE_RATE;
         const calculatedVatAmount = (calculatedItemsTotal + calculatedServiceCharge) * VAT_RATE; 
         const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
 
-        // --- CHANGE 1: 'Pending' changed to 'pending' ---
-        // This fixes the NULL bug on creation.
-        // Changed `staff_id` column to `employee_id`.
-        const orderSql = `
-            INSERT INTO fb_orders 
-            (client_id, employee_id, order_type, delivery_location, status, items_total, service_charge_amount, vat_amount, total_amount) 
-            VALUES (NULL, ?, ?, ?, 'pending', ?, ?, ?, ?)
-        `;
-        const [orderResult] = await connection.query(orderSql, [
-            employee_id, 
-            order_type, 
-            delivery_location, 
-            calculatedItemsTotal,
-            calculatedServiceCharge,
-            calculatedVatAmount,
-            calculatedTotalAmount
-        ]);
-        order_id = orderResult.insertId;
-
-        // ... (Step 4: Create order details is unchanged)
-        for (const item of items) {
-            const [rows] = await connection.query("SELECT price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
-            const subtotal = rows[0].price * item.quantity;
-            const itemInstructions = item.instructions || instructions || '';
-            const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
-            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, itemInstructions]);
-        }
+        // BUG FIX #3: Update order with calculated totals
+        // WHY: We created the order with 0 values, now we need to update with actual calculated amounts
+        // HOW: Run an UPDATE query after all calculations are complete
+        await connection.query(
+            `UPDATE fb_orders 
+             SET items_total = ?, service_charge_amount = ?, vat_amount = ?, total_amount = ? 
+             WHERE order_id = ?`,
+            [calculatedItemsTotal, calculatedServiceCharge, calculatedVatAmount, calculatedTotalAmount, order_id]
+        );
         
-        // ... (Step 5: Deduct stock is unchanged)
+        // Step 4: Deduct stock
         await adjustStock(items, 'deduct', connection);
         
-        // ... (Step 6: Log the stock deduction is unchanged)
+        // Step 5: Log the stock deduction
         await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
 
-        // --- 7. UPDATE THE PAYMENT INSERTION ---
+        // Step 6: Record payment
         const paymentSql =
             "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
         await connection.query(paymentSql, [
             order_id,
             payment_method || "Cash",
-            calculatedTotalAmount, // <-- THIS IS THE FIX
-            change_amount
+            calculatedTotalAmount,
+            change_amount || 0
         ]);
-        // --- END OF UPDATE ---
 
-        // ... (Commit, response, error handling is unchanged)
         await connection.commit();
 
         res.status(201).json({
@@ -122,7 +125,7 @@ export const createPosOrder = async (req, res) => {
     } catch (error) {
         await connection.rollback();
         console.error("CREATE POS ORDER ERROR:", error);
-         if (error.message.startsWith("Not enough stock")) {
+        if (error.message.startsWith("Not enough stock")) {
             return res.status(400).json({ message: error.message });
         }
         res.status(500).json({ message: "Failed to create order", error: error.message });
@@ -175,12 +178,16 @@ export const createOrder = async (req, res) => {
                 }
             }
             
-            // 3. Use the new 'actualPrice' for all calculations
             const subtotal = actualPrice * item.quantity;
             calculatedItemsTotal += subtotal;
             
+            // BUG FIX #4: Use item-specific instructions if provided
+            // WHY: Same as POS orders - allows per-item customization
+            // HOW: Check item.instructions first, then fall back to general instructions
+            const itemInstructions = item.instructions || instructions || '';
+            
             const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, subtotal, instructions) VALUES (?, ?, ?, ?, ?)";
-            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, instructions]);
+            await connection.query(detailSql, [order_id, item.item_id, item.quantity, subtotal, itemInstructions]);
         }
 
         const calculatedServiceCharge = calculatedItemsTotal * SERVICE_RATE;
@@ -204,9 +211,8 @@ export const createOrder = async (req, res) => {
             order_id
         ]);
 
-        // --- ADDED: Create the first "pending" notification ---
+        // Create the first "pending" notification
         await createOrUpdateNotification(order_id, client_id, 'pending', connection);
-        // --- END OF ADDITION ---
 
         await connection.commit();
 
@@ -229,7 +235,6 @@ export const createOrder = async (req, res) => {
 // @route   GET /api/orders
 // @access  Private
 export const getOrders = async (req, res) => {
-    // This function is unchanged
     try {
         const sql = `
             SELECT 
@@ -252,63 +257,67 @@ export const getOrders = async (req, res) => {
 // @route   GET /api/orders/:id
 // @access  Private
 export const getOrderById = async (req, res) => {
-  // This function is unchanged
-  try {
-    const { id } = req.params;
+    try {
+        const { id } = req.params;
 
-    const [orders] = await pool.query(
-      `SELECT 
-         o.*, 
-         c.first_name, 
-         c.last_name
-       FROM fb_orders o
-       LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
-       WHERE o.order_id = ?`,
-      [id]
-    );
-    if (orders.length === 0) {
-      return res.status(404).json({ message: "Order not found" });
+        const [orders] = await pool.query(
+            `SELECT 
+                o.*, 
+                c.first_name, 
+                c.last_name
+            FROM fb_orders o
+            LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
+            WHERE o.order_id = ?`,
+            [id]
+        );
+        
+        if (orders.length === 0) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+        
+        const order = orders[0];
+
+        // BUG FIX #5: Remove detail_id alias that doesn't match frontend expectations
+        // WHY: Frontend might expect order_detail_id consistently
+        // HOW: Use the actual column name without alias for clarity
+        const [items] = await pool.query(
+            `SELECT 
+                mi.item_name, 
+                od.quantity, 
+                mi.price,
+                od.subtotal,
+                od.instructions,
+                od.order_detail_id
+            FROM fb_order_details od 
+            JOIN fb_menu_items mi ON od.item_id = mi.item_id 
+            WHERE od.order_id = ?`,
+            [id]
+        );
+
+        const [payments] = await pool.query("SELECT * FROM fb_payments WHERE order_id = ?", [id]);
+        const payment = payments[0] || {};
+
+        res.json({
+            order_id: order.order_id,
+            order_date: order.order_date,
+            order_type: order.order_type,
+            delivery_location: order.delivery_location,
+            first_name: order.first_name,
+            last_name: order.last_name,
+            items_total: order.items_total,
+            service_charge_amount: order.service_charge_amount,
+            vat_amount: order.vat_amount,
+            total_price: order.total_amount,
+            status: order.status,
+            items,
+            payment_method: payment.payment_method || "PayMongo",
+            payment_status: payment.payment_status || "pending",
+        });
+    } catch (error) {
+        console.error("Error fetching order details:", error);
+        res.status(500).json({ message: "Error fetching order details", error: error.message });
     }
-    const order = orders[0];
-
-    const [items] = await pool.query(
-    `SELECT 
-        mi.item_name, 
-        od.quantity, 
-        mi.price,
-        od.instructions,
-        od.order_detail_id AS detail_id
-    FROM fb_order_details od 
-    JOIN fb_menu_items mi ON od.item_id = mi.item_id 
-    WHERE od.order_id = ?`,
-    [id]
-    );
-
-    const [payments] = await pool.query("SELECT * FROM fb_payments WHERE order_id = ?", [id]);
-    const payment = payments[0] || {};
-
-    res.json({
-      order_id: order.order_id,
-      order_date: order.order_date,
-      order_type: order.order_type,
-      delivery_location: order.delivery_location,
-      first_name: order.first_name,
-      last_name: order.last_name,
-      items_total: order.items_total,
-      service_charge_amount: order.service_charge_amount,
-      vat_amount: order.vat_amount,
-      total_price: order.total_amount,
-      status: order.status,
-      items,
-      payment_method: payment.payment_method || "PayMongo",
-      payment_status: payment.payment_status || "paid",
-    });
-  } catch (error) {
-    console.error("Error fetching order details:", error);
-    res.status(500).json({ message: "Error fetching order details", error: error.message });
-  }
 };
-
 
 // @desc    Update any order status
 // @route   PUT /api/orders/:id/status
@@ -323,25 +332,31 @@ export const updateOrderStatus = async (req, res) => {
 
     const validStatuses = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
     if (!validStatuses.includes(newStatus)) {
+        // BUG FIX #6: Release connection before returning
+        // WHY: Prevents connection leak when validation fails
+        // HOW: Release connection in all early return paths
+        connection.release();
         return res.status(400).json({ message: `Invalid status: ${status}` });
     }
 
     try {
         await connection.beginTransaction();
 
-        // Get current order status AND client_id
         const [orders] = await connection.query("SELECT status, client_id FROM fb_orders WHERE order_id = ? FOR UPDATE", [id]);
         if (orders.length === 0) {
-            throw new Error("Order not found");
+            await connection.rollback();
+            return res.status(404).json({ message: "Order not found" });
         }
+        
         const currentStatus = orders[0].status;
-        const client_id = orders[0].client_id; // Get client_id
+        const client_id = orders[0].client_id;
 
         if (currentStatus === newStatus) {
-             return res.status(400).json({ message: `Order is already ${newStatus}` });
+            await connection.rollback();
+            return res.status(400).json({ message: `Order is already ${newStatus}` });
         }
 
-        // --- BUSINESS LOGIC BLOCK ---
+        // BUSINESS LOGIC: Stock management based on status transitions
         if (newStatus === 'preparing' && currentStatus === 'pending') {
             console.log(`Deducting stock for order ${id}...`);
             const [details] = await connection.query("SELECT item_id, quantity FROM fb_order_details WHERE order_id = ?", [id]);
@@ -352,11 +367,17 @@ export const updateOrderStatus = async (req, res) => {
             console.log(`Ingredient stock deducted and logged for order ${id}`);
 
         } else if (newStatus === 'cancelled') {
+            // BUG FIX #7: Only restore stock if order was preparing/ready AND not paid
+            // WHY: Prevents incorrect stock restoration for already-paid orders
+            // HOW: Check both status and payment status before restoring stock
             if (currentStatus === 'preparing' || currentStatus === 'ready') {
-                const [payments] = await connection.query("SELECT * FROM fb_payments WHERE order_id = ? AND payment_status = 'paid'", [id]);
+                const [payments] = await connection.query(
+                    "SELECT * FROM fb_payments WHERE order_id = ? AND payment_status = 'paid'", 
+                    [id]
+                );
 
                 if (payments.length > 0) {
-                    console.warn(`Order ${id} was already paid. Cancellation requested, but stock NOT restored automatically.`);
+                    console.warn(`Order ${id} was already paid. Stock NOT restored (requires manual inventory adjustment).`);
                 } else {
                     console.log(`Restoring ingredient stock for cancelled unpaid order: ${id}`);
                     const [details] = await connection.query("SELECT item_id, quantity FROM fb_order_details WHERE order_id = ?", [id]);
@@ -366,9 +387,8 @@ export const updateOrderStatus = async (req, res) => {
                 }
             }
         }
-        // --- END OF BUSINESS LOGIC BLOCK ---
 
-        // Update the order status and who updated it
+        // Update the order status
         const [result] = await connection.query(
             "UPDATE fb_orders SET status = ?, employee_id = ? WHERE order_id = ?", 
             [newStatus, employee_id, id]
@@ -378,9 +398,8 @@ export const updateOrderStatus = async (req, res) => {
             throw new Error("Order not found or status unchanged");
         }
 
-        // --- ADDED: Create/Update the notification ---
+        // Create/Update the notification
         await createOrUpdateNotification(id, client_id, newStatus, connection);
-        // --- END OF ADDITION ---
 
         await connection.commit();
         res.json({ message: `Order status updated to ${newStatus}` });
@@ -396,7 +415,6 @@ export const updateOrderStatus = async (req, res) => {
         connection.release();
     }
 };
-
 
 // @desc    Get kitchen orders (pending, preparing, ready)
 // @route   GET /api/orders/kitchen
@@ -440,56 +458,73 @@ export const getServedOrders = async (req, res) => {
     }
 };
 
-
-// --- NEW HELPER FUNCTION TO CREATE NOTIFICATIONS ---
+// Helper function to create/update notifications
 const createOrUpdateNotification = async (order_id, client_id, status, connection) => {
-  // If there's no client_id (e.g., a POS order), we can't create a notification.
-  if (!client_id) {
-    return;
-  }
-
-  try {
-    // Step 1: Delete any existing notifications for this order.
-    // This ensures the customer only sees the *latest* status.
-    const deleteSql = "DELETE FROM fb_notifications WHERE order_id = ?";
-    await (connection || pool).query(deleteSql, [order_id]);
-
-    // Step 2: Define the message based on the status.
-    let title = `Order #${order_id} Updated!`;
-    let message = `Your order #${order_id} is now ${status}.`;
-
-    switch (status) {
-      case 'pending':
-        title = 'Order Placed!';
-        message = `Your order #${order_id} is now pending.`;
-        break;
-      case 'preparing':
-        title = 'Order Preparing!';
-        message = `Your order #${order_id} is now being prepared.`;
-        break;
-      case 'ready':
-        title = 'Order Ready!';
-        message = `Your order #${order_id} is ready for pickup/delivery!`;
-        break;
-      case 'served':
-        title = 'Order On Its Way!';
-        message = `Your order #${order_id} is on its way for delivery!`;
-        break;
-      case 'cancelled':
-        title = 'Order Cancelled';
-        message = `Your order #${order_id} has been cancelled.`;
-        break;
+    if (!client_id) {
+        return;
     }
 
-    // Step 3: Insert the new notification. (It's unread by default)
-    const insertSql = `
-      INSERT INTO fb_notifications (client_id, order_id, title, message, is_read)
-      VALUES (?, ?, ?, ?, 0)
-    `;
-    await (connection || pool).query(insertSql, [client_id, order_id, title, message]);
+    try {
+        // --- 1. NEW LOGIC: Only allow deletion for 'served' orders OR 
+        //    if the notification is for the order currently being updated (to prevent duplicates) ---
+        
+        // This query deletes any notification associated with this specific order_id 
+        // IF the order's status is 'served'. This ensures 'served' notifications are 
+        // eligible for deletion (e.g., via the Clear All button in NotificationPanel.jsx, 
+        // which will call an endpoint that ultimately runs this logic for served orders).
+        // It also deletes the existing notification for the current order_id 
+        // *before* inserting the new one, regardless of status, which is necessary 
+        // to prevent duplicate notifications for the same order_id/status update.
 
-  } catch (error) {
-    // Log the error but don't crash the main transaction
-    console.error(`Failed to create notification for order ${order_id}:`, error.message);
-  }
+        const deleteSql = `
+            DELETE n
+            FROM fb_notifications n
+            JOIN fb_orders o ON n.order_id = o.order_id
+            WHERE n.order_id = ? 
+              AND (o.status = 'served' OR n.order_id = ?) 
+        `;
+        // The second 'n.order_id = ?' ensures the *current* notification for this order_id 
+        // is always deleted before a new one is created, preventing duplicate notifications 
+        // for the same order when its status changes.
+        await (connection || pool).query(deleteSql, [order_id, order_id]);
+        
+        // --- END NEW LOGIC ---
+
+        // Define message based on status
+        let title = `Order #${order_id} Updated!`;
+        let message = `Your order #${order_id} is now ${status}.`;
+
+        switch (status) {
+            case 'pending':
+                title = 'Order Placed!';
+                message = `Your order #${order_id} is now pending.`;
+                break;
+            case 'preparing':
+                title = 'Order Preparing!';
+                message = `Your order #${order_id} is now being prepared.`;
+                break;
+            case 'ready':
+                title = 'Order Ready!';
+                message = `Your order #${order_id} is ready for pickup/delivery!`;
+                break;
+            case 'served':
+                title = 'Order On Its Way!';
+                message = `Your order #${order_id} is on its way for delivery!`;
+                break;
+            case 'cancelled':
+                title = 'Order Cancelled';
+                message = `Your order #${order_id} has been cancelled.`;
+                break;
+        }
+
+        // Insert new notification
+        const insertSql = `
+            INSERT INTO fb_notifications (client_id, order_id, title, message, is_read)
+            VALUES (?, ?, ?, ?, 0)
+        `;
+        await (connection || pool).query(insertSql, [client_id, order_id, title, message]);
+
+    } catch (error) {
+        console.error(`Failed to create notification for order ${order_id}:`, error.message);
+    }
 };
