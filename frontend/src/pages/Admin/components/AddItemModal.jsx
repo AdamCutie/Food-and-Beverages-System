@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { X, UploadCloud, PlusCircle, Trash2 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import apiClient from '../../../utils/apiClient'; // <-- This should be here
+import apiClient from '../../../utils/apiClient';
 
-// --- 1. categories prop is now the fetched list: [{category_id: 1, name: "Appetizer"}, ...]
 const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) => {
   const { token } = useAuth();
 
@@ -15,17 +14,10 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
     price: '',
     image_url: '',
     ingredients: [],
-    is_promo: false,
-    promo_discount_percentage: '',
-    promo_expiry_date: '',
+    // REMOVED: is_promo, promo_discount_percentage, promo_expiry_date
   });
   const [uploading, setUploading] = useState(false);
   const isEditMode = Boolean(itemToEdit);
-
-  // --- 3. REMOVED all state related to "Add New Category" ---
-  // const [selectedDropdownCategory, setSelectedDropdownCategory] = useState('');
-  // const [newCategoryName, setNewCategoryName] = useState('');
-  // const showNewCategoryInput = selectedDropdownCategory === 'ADD_NEW';
 
   const [availableIngredients, setAvailableIngredients] = useState([]);
   const [selectedIngredientId, setSelectedIngredientId] = useState('');
@@ -69,18 +61,11 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
                   quantity_consumed: ing.quantity_consumed,
                   unit_of_measurement: ing.unit_of_measurement
               })) || [],
-
-             is_promo: data.is_promo || false,
-              promo_discount_percentage: data.promo_discount_percentage || '',
-              // Format "2025-11-01T00:00:00.000Z" to "2025-11-01"
-              promo_expiry_date: data.promo_expiry_date
-                ? new Date(data.promo_expiry_date).toISOString().split('T')[0]
-                : '',
-
+              // REMOVED: Promo fields mapping
             });
           } catch (err) {
             toast.error(err.message);
-
+            // Fallback if fetch fails
             setFormData({
               item_name: itemToEdit.item_name || '',
               description: itemToEdit.description || '',
@@ -88,26 +73,15 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
               price: itemToEdit.price || '',
               image_url: itemToEdit.image_url || '',
               ingredients: [],
-
-              is_promo: itemToEdit.is_promo || false,
-              promo_discount_percentage: itemToEdit.promo_discount_percentage || '',
-              // Format "2025-11-01T00:00:00.000Z" to "2025-11-01"
-              promo_expiry_date: itemToEdit.promo_expiry_date 
-                ? new Date(itemToEdit.promo_expiry_date).toISOString().split('T')[0] 
-                : ''
-
             });
           }
         };
         fetchItemDetails();
         
       } else {
-
         setFormData({ 
-          item_name: '', description: '', category_id: '', price: '', image_url: '', ingredients: [],
-          is_promo: false, promo_discount_percentage: '', promo_expiry_date: ''
+          item_name: '', description: '', category_id: '', price: '', image_url: '', ingredients: []
         });
-
       }
       setSelectedIngredientId('');
       setIngredientQuantity('');
@@ -118,27 +92,11 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    const { id, value, type, checked } = e.target;
-
-    setFormData((prevData) => {
-      const newData = {
-        ...prevData,
-        [id]: type === 'checkbox' ? checked : value,
-      };
-
-      // --- THIS IS THE FIX ---
-      // If the user just checked the 'is_promo' box
-      if (id === 'is_promo' && checked) {
-        // And if the expiry date is currently empty
-        if (!newData.promo_expiry_date) {
-          // Set it to today's date by default
-          newData.promo_expiry_date = new Date().toISOString().split('T')[0];
-        }
-      }
-      // --- END OF FIX ---
-
-      return newData;
-    });
+    const { id, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [id]: value,
+    }));
   };
   
 
@@ -149,28 +107,23 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
       uploadFormData.append('image', file);
       setUploading(true);
       try {
-  
         const response = await apiClient('/upload', {
           method: 'POST',
           body: uploadFormData,
         });
         
         const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.message || 'Image upload failed');
-        }
+        if (!response.ok) throw new Error(data.message || 'Image upload failed');
+        
         setFormData(prevData => ({ ...prevData, image_url: data.image }));
         toast.success('Image uploaded successfully!');
       } catch (error) {
-         if (error.message !== 'Session expired') {
-          toast.error(error.message);
-        }
+         if (error.message !== 'Session expired') toast.error(error.message);
       } finally {
         setUploading(false);
       }
   };
 
-  // ... (Recipe handlers are unchanged) ...
   const handleAddIngredientToRecipe = () => {
     if (!selectedIngredientId || !ingredientQuantity || parseFloat(ingredientQuantity) <= 0) {
       toast.error('Please select an ingredient and enter a valid quantity.');
@@ -208,7 +161,6 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // --- 6. UPDATE VALIDATION ---
     if (!formData.category_id) {
         toast.error('Please select a category.');
         return;
@@ -217,37 +169,23 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
         toast.error('A menu item must have at least one ingredient in its recipe.');
         return;
     }
-    
-    // onSave will now send formData with category_id
     onSave(formData);
   };
 
-  // ... (Styling objects are unchanged) ...
+  // Styles
   const inputStyle = {
-    marginTop: '4px',
-    display: 'block',
-    width: '100%',
-    border: '1px solid #D1D5DB', // gray-300
-    borderRadius: '0.375rem', // rounded-md
-    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-    padding: '8px 12px',
+    marginTop: '4px', display: 'block', width: '100%',
+    border: '1px solid #D1D5DB', borderRadius: '0.375rem',
+    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', padding: '8px 12px',
   };
   const labelStyle = {
-    display: 'block',
-    fontSize: '0.875rem', // text-sm
-    fontWeight: '500', // font-medium
-    color: '#374151', // gray-700
+    display: 'block', fontSize: '0.875rem', fontWeight: '500', color: '#374151',
   };
   const buttonStyle = {
-    padding: '8px 16px',
-    backgroundColor: '#1D4ED8', // blue-600
-    color: 'white',
-    borderRadius: '0.375rem',
-    border: 'none',
-    cursor: 'pointer'
+    padding: '8px 16px', backgroundColor: '#1D4ED8', color: 'white',
+    borderRadius: '0.375rem', border: 'none', cursor: 'pointer'
   };
-  const cancelButtonStyle = { ...buttonStyle, backgroundColor: '#E5E7EB', color: '#1F2937' }; // gray-200
-
+  const cancelButtonStyle = { ...buttonStyle, backgroundColor: '#E5E7EB', color: '#1F2937' };
 
   return (
     <div style={{
@@ -276,35 +214,24 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
               <textarea id="description" rows="3" value={formData.description} onChange={handleChange} style={inputStyle}></textarea>
             </div>
             
-            {/* --- 7. SIMPLIFIED CATEGORY DROPDOWN --- */}
             <div>
               <label htmlFor="category_id" style={labelStyle}>Category</label>
-              <select 
-                id="category_id" // Use category_id
-                value={formData.category_id} // Bind to category_id
-                onChange={handleChange} // Use generic handler
-                required 
-                style={inputStyle}
-              >
+              <select id="category_id" value={formData.category_id} onChange={handleChange} required style={inputStyle}>
                 <option value="" disabled>Select a category</option>
                 {categories.map(cat => (
-                  <option key={cat.category_id} value={cat.category_id}>
-                    {cat.name}
-                  </option>
+                  <option key={cat.category_id} value={cat.category_id}>{cat.name}</option>
                 ))}
               </select>
             </div>
-            {/* --- 8. REMOVED "Add New Category" Input --- */}
 
             <div>
               <label htmlFor="price" style={labelStyle}>Price</label>
               <input type="number" id="price" step="0.01" value={formData.price} onChange={handleChange} required style={inputStyle} />
             </div>
             <div>
-              {/* ... (Image upload JSX is unchanged) ... */}
               <label style={labelStyle}>Image</label>
               {formData.image_url && (
-                <img src={`http://localhost:3000${formData.image_url}`} alt="Preview" style={{ width: '100%', height: '128px', objectFit: 'cover', borderRadius: '0.375rem', margin: '8px 0' }} />
+                <img src={`http://localhost:21917${formData.image_url}`} alt="Preview" style={{ width: '100%', height: '128px', objectFit: 'cover', borderRadius: '0.375rem', margin: '8px 0' }} />
               )}
               <label htmlFor="image-upload" style={{
                 marginTop: '4px', display: 'flex', justifyContent: 'center', padding: '20px',
@@ -320,7 +247,7 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
             </div>
           </div>
 
-          {/* Column 2: Recipe Builder (Unchanged) */}
+          {/* Column 2: Recipe Builder */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', borderLeft: '1px solid #E5E7EB', paddingLeft: '24px' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Recipe</h3>
             
@@ -367,73 +294,13 @@ const AddItemModal = ({ isOpen, onClose, onSave, categories = [], itemToEdit }) 
                   ))}
                 </ul>
               )}
-              {/* --- ADD THIS ENTIRE PROMO SECTION --- */}
-            <div style={{ 
-              border: '1px solid #E5E7EB', // gray-200
-              borderRadius: '0.375rem', // rounded-md
-              padding: '16px', 
-              marginTop: '16px',
-              backgroundColor: '#F9FAFB' // gray-50
-            }}>
-              
-              {/* Checkbox */}
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  id="is_promo"
-                  checked={formData.is_promo}
-                  onChange={handleChange}
-                  style={{ 
-                    height: '16px', 
-                    width: '16px', 
-                    marginRight: '8px',
-                    cursor: 'pointer'
-                  }}
-                />
-                <label htmlFor="is_promo" style={{ ...labelStyle, cursor: 'pointer' }}>
-                  This is a promotional item
-                </label>
-              </div>
-
-              {/* Conditional Promo Fields */}
-              {formData.is_promo && (
-                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label htmlFor="promo_discount_percentage" style={labelStyle}>
-                      Discount (%)
-                    </label>
-                    <input
-                      type="number"
-                      id="promo_discount_percentage"
-                      value={formData.promo_discount_percentage}
-                      onChange={handleChange}
-                      style={inputStyle}
-                      placeholder="e.g., 15"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="promo_expiry_date" style={labelStyle}>
-                      Promo Expiry Date
-                    </label>
-                    <input
-                      type="date"
-                      id="promo_expiry_date"
-                      value={formData.promo_expiry_date}
-                      onChange={handleChange}
-                      style={inputStyle}
-                      placeholder="YYYY-MM-DD"
-                    />
-                  </div>
-                </div>
-              )}
             </div>
-            {/* --- END OF PROMO SECTION --- */}
-            </div>
+            
+            {/* REMOVED PROMO SECTION FROM HERE */}
+
           </div>
         </form>
         
-        {/* Main Form Buttons (Unchanged) */}
         <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'flex-end', gap: '16px', paddingTop: '24px', borderTop: '1px solid #E5E7EB' }}>
           <button type="button" onClick={onClose} style={cancelButtonStyle}>Cancel</button>
           <button type="submit" form="main-form" onClick={handleSubmit} style={{ ...buttonStyle, backgroundColor: '#1D4ED8' }} disabled={uploading}>
