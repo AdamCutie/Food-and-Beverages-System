@@ -7,26 +7,31 @@ import {
     deleteEmployee
 } from "../controllers/adminController.js";
 import { 
+    // Note: These item functions might be moved to itemController, 
+    // but if you are importing them here, ensure they exist or import from itemController
     createMenuItem, 
     updateMenuItem, 
     deleteMenuItem 
-} from "../controllers/itemController.js"; // <-- Import item management functions
+} from "../controllers/itemController.js"; 
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 // --- Staff Management ---
-router.get("/staff", protect, authorizeRoles("admin", "employee"), getAllEmployees);
-router.post("/staff", protect, authorizeRoles("admin", "employee"), createEmployee);
-router.put("/staff/:id", protect, authorizeRoles("admin", "employee"), updateEmployee);
-router.delete("/staff/:id", protect, authorizeRoles("admin", "employee"), deleteEmployee);
+// UPDATED: Allow 'F&B Admin' to manage staff
+router.get("/staff", protect, authorizeRoles("F&B Admin"), getAllEmployees);
+router.post("/staff", protect, authorizeRoles("F&B Admin"), createEmployee);
+router.put("/staff/:id", protect, authorizeRoles("F&B Admin"), updateEmployee);
+router.delete("/staff/:id", protect, authorizeRoles("F&B Admin"), deleteEmployee);
 
 // --- Customer Management ---
-router.get("/customers", protect, authorizeRoles("admin", "employee"), getAllCustomers);
+// UPDATED: Allow 'F&B Admin' to view customers
+router.get("/customers", protect, authorizeRoles("F&B Admin"), getAllCustomers);
 
-// --- Menu Item Management --- 
-router.post("/items", protect, authorizeRoles("admin", "employee"), createMenuItem);
-router.put("/items/:id", protect, authorizeRoles("admin", "employee"), updateMenuItem);
-router.delete("/items/:id", protect, authorizeRoles("admin", "employee"), deleteMenuItem);
+// --- Menu Item Management (Admin Actions) --- 
+// UPDATED: Allow 'F&B Admin' to manage menu
+router.post("/items", protect, authorizeRoles("F&B Admin"), createMenuItem);
+router.put("/items/:id", protect, authorizeRoles("F&B Admin"), updateMenuItem);
+router.delete("/items/:id", protect, authorizeRoles("F&B Admin"), deleteMenuItem);
 
 export default router;

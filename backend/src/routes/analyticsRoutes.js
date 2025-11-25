@@ -4,7 +4,7 @@ import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// This route is protected and only accessible by admins
-router.get("/", protect, authorizeRoles("admin"), getDashboardAnalytics);
+// UPDATED: Only 'F&B Admin' can view analytics
+router.get("/", protect, authorizeRoles("F&B Admin"), getDashboardAnalytics);
 
 export default router;

@@ -201,10 +201,12 @@ export const loginUser = async (req, res) => {
         u.password, 
         u.role, 
         e.first_name, 
-        e.last_name 
+        e.last_name,
+        p.position_name
       FROM employee_emails ee
       JOIN employees e ON ee.employee_id = e.employee_id
       JOIN users u ON e.user_id = u.user_id
+      LEFT JOIN job_positions p ON e.position_id = p.position_id
       WHERE ee.email = ?
     `;
     
@@ -221,7 +223,8 @@ export const loginUser = async (req, res) => {
         id: userId, 
         role: userType, 
         firstName: user.first_name, 
-        lastName: user.last_name
+        lastName: user.last_name,
+        position: user.position_name ? user.position_name.trim() : null // Add Position to Token (trimmed)
       };
 
       // Verify HRIS Password

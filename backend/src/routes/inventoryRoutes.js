@@ -12,23 +12,37 @@ import {
 
 const router = express.Router();
 
-// --- ⭐️ FIX: "/logs" MUST be defined before "/:id" ---
-// @access Admin only
-router.get("/logs", protect, authorizeRoles("admin"), getInventoryLogs);
+// --- 1. Inventory Logs ---
+// Allowed: F&B Admin and Kitchen Staffs (to check past movements)
+router.get(
+    "/logs", 
+    protect, 
+    authorizeRoles("F&B Admin", "Kitchen Staffs"), 
+    getInventoryLogs
+);
 
-// @access Staff (Admin, Waiter, Cashier)
+// --- 2. Ingredients Management ---
 router.route("/")
-    .get(protect, authorizeRoles("admin", "waiter", "cashier"), getAllIngredients)
-    .post(protect, authorizeRoles("admin", "waiter", "cashier"), createIngredient);
+    // View: All F&B Staff need to see ingredients
+    .get(protect, authorizeRoles("F&B Admin", "Kitchen Staffs", "Waiter", "Cashier"), getAllIngredients)
+    // Create: Only F&B Admin and Kitchen Staffs
+    .post(protect, authorizeRoles("F&B Admin", "Kitchen Staffs"), createIngredient);
 
-// @access Staff (Admin, Waiter, Cashier)
-// This will now correctly handle IDs (e.g., /1, /2) and not "logs"
 router.route("/:id")
-    .get(protect, authorizeRoles("admin", "waiter", "cashier"), getIngredientById)
-    .put(protect, authorizeRoles("admin", "waiter", "cashier"), updateIngredientDetails)
-    .delete(protect, authorizeRoles("admin", "waiter", "cashier"), deleteIngredient);
+    // View Single: All F&B Staff
+    .get(protect, authorizeRoles("F&B Admin", "Kitchen Staffs", "Waiter", "Cashier"), getIngredientById)
+    // Update Details (Name/Unit): F&B Admin and Kitchen Staffs
+    .put(protect, authorizeRoles("F&B Admin", "Kitchen Staffs"), updateIngredientDetails)
+    // Delete: F&B Admin Only (Critical action)
+    .delete(protect, authorizeRoles("F&B Admin"), deleteIngredient);
 
-// @access Staff (Admin, Waiter, Cashier)
-router.put("/:id/stock", protect, authorizeRoles("admin", "waiter", "cashier"), adjustIngredientStock);
+// --- 3. Stock Adjustment ---
+// Allow Kitchen Staffs to manage stock (Restock/Waste)
+router.put(
+    "/:id/stock", 
+    protect, 
+    authorizeRoles("F&B Admin", "Kitchen Staffs"), 
+    adjustIngredientStock
+);
 
 export default router;

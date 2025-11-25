@@ -12,38 +12,43 @@ import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// --- 1. ADD 'protect' and 'authorizeRoles' TO THESE ROUTES ---
+// --- 1. Kitchen Display Routes ---
+// Allowed: F&B Admin, Kitchen Staffs, Waiter, Cashier
 router.get(
     '/kitchen', 
     protect, 
-    authorizeRoles("admin", "waiter", "cashier"), 
+    authorizeRoles("F&B Admin", "Kitchen Staffs", "Waiter", "Cashier"), 
     getKitchenOrders
 ); 
+
 router.get(
     '/served', 
     protect, 
-    authorizeRoles("admin", "waiter", "cashier"), 
+    authorizeRoles("F&B Admin", "Kitchen Staffs", "Waiter", "Cashier"), 
     getServedOrders
 );
 
+// --- 2. POS Order Creation ---
+// Allowed: F&B Admin, Waiter, Cashier
 router.post(
     "/pos", 
     protect, 
-    authorizeRoles("admin", "waiter", "cashier"), 
+    authorizeRoles("F&B Admin", "Waiter", "Cashier"), 
     createPosOrder
 );
 
-router.post("/", protect, createOrder); 
-router.get("/", getOrders); // admin
-router.get("/:id", getOrderById);
-
-// --- 2. ADD 'protect' and 'authorizeRoles' TO THIS ROUTE ---
+// --- 3. Order Status Updates (Kitchen/POS) ---
+// Allowed: F&B Admin, Kitchen Staffs, Waiter, Cashier
 router.put(
     "/:id/status", 
     protect, 
-    authorizeRoles("admin", "waiter", "cashier"), 
+    authorizeRoles("F&B Admin", "Kitchen Staffs", "Waiter", "Cashier"), 
     updateOrderStatus
 );
-// --- END OF CHANGE ---
+
+// --- 4. Admin/Customer Routes ---
+router.post("/", protect, createOrder); // Customer creates own order (checked by role=customer internally or logic)
+router.get("/", getOrders); // Usually Admin only, or filtering in controller
+router.get("/:id", getOrderById); // Public/Protected mixed logic in controller
 
 export default router;
