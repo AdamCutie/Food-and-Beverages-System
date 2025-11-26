@@ -16,12 +16,13 @@ const AuthRoute = ({ children }) => {
         case 'F&B Admin':
           return '/admin';
         case 'Kitchen Staffs':
-        case 'Waiter':
-        case 'Cashier':
-        case 'Stock Controller':
           return '/kitchen';
+        case 'Cashier':
+          return '/kitchen/pos';
+        case 'Stock Controller':
+          return '/kitchen/inventory';
         default:
-          return '/kitchen'; // Default staff page
+          return '/kitchen';
       }
     }
 
@@ -32,7 +33,7 @@ const AuthRoute = ({ children }) => {
 
     return '/';
   };
-
+  
   if (isAuthenticated) {
     // Pass the whole user object to the helper
     const path = getRedirectPath(user);

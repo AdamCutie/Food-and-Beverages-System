@@ -13,35 +13,32 @@ import {
 const router = express.Router();
 
 // --- 1. Inventory Logs ---
-// Allowed: F&B Admin and Kitchen Staffs (to check past movements)
+// Allowed: F&B Admin and Stock Controller (Primary), Kitchen Staffs (Optional/View)
 router.get(
     "/logs", 
     protect, 
-    authorizeRoles("F&B Admin", "Kitchen Staffs"), 
+    authorizeRoles("F&B Admin", "Stock Controller"), 
     getInventoryLogs
 );
 
 // --- 2. Ingredients Management ---
 router.route("/")
-    // View: All F&B Staff need to see ingredients
-    .get(protect, authorizeRoles("F&B Admin", "Kitchen Staffs", "Waiter", "Cashier"), getAllIngredients)
-    // Create: Only F&B Admin and Kitchen Staffs
-    .post(protect, authorizeRoles("F&B Admin", "Kitchen Staffs"), createIngredient);
+    // View: All Staff need to see ingredients for Menu/POS to work
+    .get(protect, authorizeRoles("F&B Admin", "Stock Controller"), getAllIngredients)
+    // Create: Only F&B Admin and Stock Controller
+    .post(protect, authorizeRoles("F&B Admin", "Stock Controller"), createIngredient);
 
 router.route("/:id")
-    // View Single: All F&B Staff
-    .get(protect, authorizeRoles("F&B Admin", "Kitchen Staffs", "Waiter", "Cashier"), getIngredientById)
-    // Update Details (Name/Unit): F&B Admin and Kitchen Staffs
-    .put(protect, authorizeRoles("F&B Admin", "Kitchen Staffs"), updateIngredientDetails)
-    // Delete: F&B Admin Only (Critical action)
+    .get(protect, authorizeRoles("F&B Admin", "Stock Controller"), getIngredientById)
+    .put(protect, authorizeRoles("F&B Admin", "Stock Controller"), updateIngredientDetails)
     .delete(protect, authorizeRoles("F&B Admin"), deleteIngredient);
 
 // --- 3. Stock Adjustment ---
-// Allow Kitchen Staffs to manage stock (Restock/Waste)
+// Allowed: F&B Admin and Stock Controller (Kitchen Staffs added if they need to report waste)
 router.put(
     "/:id/stock", 
     protect, 
-    authorizeRoles("F&B Admin", "Kitchen Staffs"), 
+    authorizeRoles("F&B Admin", "Stock Controller", "Kitchen Staffs"), 
     adjustIngredientStock
 );
 

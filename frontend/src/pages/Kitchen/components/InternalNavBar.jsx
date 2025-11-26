@@ -6,6 +6,7 @@ import { useAuth } from '../../../context/AuthContext';
 const InternalNavBar = () => {
   const { user } = useAuth();
   
+  // Your Original Styles
   const navLinkStyle = {
     color: 'white',
     textDecoration: 'none',
@@ -15,7 +16,6 @@ const InternalNavBar = () => {
     fontSize: '18px',
   };
 
-  // Style for the active nav link
   const activeNavLinkStyle = {
     ...navLinkStyle,
     color: '#F9A825', // Accent color for active link
@@ -34,11 +34,19 @@ const InternalNavBar = () => {
     fontSize: '16px',
     transition: 'background-color 0.2s',
   };
+  
   const hoverAdminLinkStyle = {
-    backgroundColor: '#F9A825', // Your orange accent
-    color: '#3C2A21', // Dark text for contrast
+    backgroundColor: '#F9A825', 
+    color: '#3C2A21', 
     border: '1px solid #F9A825',
   };
+
+  // Permission Helper
+  const hasAccess = (allowedPositions) => {
+    if (!user || !user.position) return false;
+    return allowedPositions.includes(user.position);
+  };
+
   return (
     <nav style={{
         backgroundColor: '#3C2A21', // Dark brown background
@@ -52,58 +60,72 @@ const InternalNavBar = () => {
         top: 0,
         zIndex: 10,
     }}>
-      {/* Left: Logo and Title */}
+      {/* Left: Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <Link to="/kitchen">
           <img src="/images/logo_var.svg" alt="Logo" style={{ height: '64px' }} />
         </Link>
       </div>
 
-      {/* Center: Navigation Links (Kitchen ONLY) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '100px' }}>
-        <NavLink
-          to="/kitchen"
-          end
-          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
-        >
-          Kitchen
-        </NavLink>
-        
-        <NavLink
-          to="/kitchen/tables"
-          end
-          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
-        >
-          Table Management
-        </NavLink>
+      {/* Center: Navigation Links */}
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+          
+          {/* 1. Kitchen View (Orders) */}
+          {hasAccess(['F&B Admin', 'Kitchen Staffs']) && (
+            <NavLink 
+                to="/kitchen" 
+                end 
+                style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
+            >
+              Orders
+            </NavLink>
+          )}
 
-        {/* --- NEW LINK ADDED HERE --- */}
-        <NavLink
-          to="/kitchen/pos"
-          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
-        >
-          Walk-in
-        </NavLink>
-        {/* --- END OF NEW LINK --- */}
+          {/* 2. POS (Walk-in) */}
+          {hasAccess(['F&B Admin', 'Cashier']) && (
+             <NavLink 
+                to="/kitchen/pos" 
+                style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
+             >
+               Walk-In
+             </NavLink>
+          )}
 
-        <NavLink
-          to="/kitchen/inventory"
-          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
-        >
-          Inventory
-        </NavLink>
+          {/* 3. Tables */}
+          {hasAccess(['F&B Admin', 'Kitchen Staffs']) && (
+             <NavLink 
+                to="/kitchen/tables" 
+                style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
+             >
+               Table Availablity
+             </NavLink>
+          )}
 
-        <NavLink
-          to="/kitchen/archive"
-          style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
-        >
-          Archive
-        </NavLink>
+          {/* 4. Inventory */}
+          {hasAccess(['F&B Admin', 'Stock Controller']) && (
+             <NavLink 
+                to="/kitchen/inventory" 
+                style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
+             >
+               Inventory
+             </NavLink>
+          )}
+
+          {/* 5. Archive */}
+          {hasAccess(['F&B Admin', 'Kitchen Staffs']) && (
+             <NavLink 
+                to="/kitchen/archive" 
+                style={({ isActive }) => (isActive ? activeNavLinkStyle : navLinkStyle)}
+             >
+               Archive
+             </NavLink>
+          )}
       </div>
 
+      {/* Right: Admin Button & Profile */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
         
-        {/* --- Conditionally render Admin Dashboard link --- */}
+        {/* Conditionally render Admin Dashboard link */}
         {user && user.position === 'F&B Admin' && ( 
           <Link
             to="/admin"
@@ -114,7 +136,6 @@ const InternalNavBar = () => {
             Go to Admin Dashboard
           </Link>
         )}
-        
 
         <ProfileDropdown />
       </div>

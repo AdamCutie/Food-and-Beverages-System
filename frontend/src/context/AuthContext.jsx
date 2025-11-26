@@ -54,14 +54,17 @@ export const AuthProvider = ({ children }) => {
         case 'F&B Admin':
           navigate('/admin');
           break;
-        case 'Kitchen Staffs': // Note: Matches DB spelling
-        case 'Waiter':
+        case 'Kitchen Staffs':
+          navigate('/kitchen'); // Default to Orders
+          break;
         case 'Cashier':
-        case 'Stock Controller': // Added per your mention
-          navigate('/kitchen');
+          navigate('/kitchen/pos'); // Default to POS
+          break;
+        case 'Stock Controller':
+          navigate('/kitchen/inventory'); // Default to Inventory
           break;
         default:
-          // Fallback for other staff positions not explicitly handled
+          // Fallback
           console.warn(`Unknown staff position: ${position}`);
           navigate('/kitchen'); 
       }
