@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2 } from 'lucide-react';
-import apiClient from '../../../utils/apiClient'; // Import API client
+import apiClient from '../../../utils/apiClient';
 
 const CartPanel = ({
   cartItems = [],
@@ -18,12 +18,12 @@ const CartPanel = ({
   isPlacingOrder
 }) => {
   const [tables, setTables] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  
+  // We need local state to control the inputs properly
   const [selectedTableId, setSelectedTableId] = useState('');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
 
-  const [rooms, setRooms] = useState([]);        // Store fetched rooms
-  const [selectedRoomId, setSelectedRoomId] = useState(''); // Selected Room ID
-
-  // Fetch tables when component mounts
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -41,15 +41,32 @@ const CartPanel = ({
     fetchData();
   }, []);
 
-  // Handle Table Selection
-  const handleLocationChange = (e) => {
+  // --- RESET LOGIC ---
+  // When order type changes, reset selections
+  useEffect(() => {
+    if (orderType === 'Dine-in') {
+        setSelectedRoomId('');
+        setDeliveryLocation(''); // Clear any old room data
+    } else if (orderType === 'Room Dining') {
+        setSelectedTableId('');
+        setDeliveryLocation(''); // Clear any old table data
+    }
+  }, [orderType, setDeliveryLocation]);
+
+
+  // --- HANDLERS ---
+
+  const handleTableChange = (e) => {
+    const tId = e.target.value;
+    setSelectedTableId(tId);
+    // Important: Pass this ID up to the parent via setDeliveryLocation so validation passes
+    setDeliveryLocation(tId); 
+  };
+
+  const handleRoomChange = (e) => {
     const rId = e.target.value;
     setSelectedRoomId(rId);
-    if (rId) {
-        setDeliveryLocation(rId); // Store ID temporarily
-    } else {
-        setDeliveryLocation('');
-    }
+    setDeliveryLocation(rId);
   };
 
   // Calculations
@@ -86,7 +103,7 @@ const CartPanel = ({
           {/* Order Type Buttons */}
           <div className="flex gap-2 mb-4" >
             <button
-              onClick={() => { setOrderType('Dine-in'); setDeliveryLocation(''); setSelectedTableId(''); }}
+              onClick={() => setOrderType('Dine-in')}
               className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
                 orderType === 'Dine-in' ? 'bg-[#0B3D2E] text-white' : 'bg-gray-200 text-gray-700'
               }`}
@@ -94,7 +111,7 @@ const CartPanel = ({
               Dine-in
             </button>
             <button
-              onClick={() => { setOrderType('Room Dining'); setDeliveryLocation(''); setSelectedTableId(''); }}
+              onClick={() => setOrderType('Room Dining')}
               className={`flex-1 py-2 text-sm font-semibold rounded-md transition-colors ${
                 orderType === 'Room Dining' ? 'bg-[#0B3D2E] text-white' : 'bg-gray-200 text-gray-700'
               }`}
@@ -103,34 +120,36 @@ const CartPanel = ({
             </button>
           </div>
 
-          {/* Location Input (Conditional) */}
+          {/* Location Selector */}
           <div className="mb-4">
             <label className="text-sm font-semibold text-gray-700 block mb-1">
-              {orderType === 'Dine-in' ? 'Select Table' : 'Room Number'}
+              {orderType === 'Dine-in' ? 'Select Table' : 'Select Room'}
             </label>
 
             {orderType === 'Dine-in' ? (
-                // --- DROPDOWN FOR DINE-IN ---
                 <select
-                    value={selectedTableId}
-                    onChange={handleLocationChange}
-                    className="w-full border border-gray-300 rounded-md p-2 bg-white"
+                    value={selectedTableId} // Controlled component
+                    onChange={handleTableChange}
+                    className="w-full border border-gray-300 rounded-md p-2 bg-white text-[#3C2A21]"
                 >
                     <option value="">-- Choose a Table --</option>
                     {tables.map(table => (
-                        <option key={table.table_id} value={table.table_id}>
-                            Table {table.table_number} ({table.capacity} seats)
+                        <option 
+                            key={table.table_id} 
+                            value={table.table_id}
+                            disabled={table.status !== 'Available'} // Optional: Disable occupied tables?
+                        >
+                            Table {table.table_number} ({table.capacity} pax) {table.status !== 'Available' ? '- Occupied' : ''}
                         </option>
                     ))}
                 </select>
             ) : (
-                // --- DROPDOWN FOR ROOM DINING ---
                 <select
-                    value={selectedRoomId}
-                    onChange={handleLocationChange}
-                    className="w-full border border-gray-300 rounded-md p-2 bg-white"
+                    value={selectedRoomId} // Controlled component
+                    onChange={handleRoomChange}
+                    className="w-full border border-gray-300 rounded-md p-2 bg-white text-[#3C2A21]"
                 >
-                    <option value="">-- Select Room Number --</option>
+                    <option value="">-- Choose a Room --</option>
                     {rooms.map(room => (
                         <option key={room.room_id} value={room.room_id}>
                             Room {room.room_num} ({room.status})
@@ -138,6 +157,18 @@ const CartPanel = ({
                     ))}
                 </select>
             )}
+          </div>
+
+          {/* Instructions */}
+          <div className="mb-4">
+            <label className="text-sm font-semibold text-gray-700 block mb-1">Special Instructions</label>
+            <textarea
+              rows="2"
+              className="w-full border border-gray-300 rounded-md p-2"
+              placeholder="e.g. No onions, extra sauce..."
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+            />
           </div>
 
           {/* Items List */}
@@ -188,7 +219,11 @@ const CartPanel = ({
                     table_id: orderType === 'Dine-in' ? selectedTableId : null,
                     room_id: orderType === 'Room Dining' ? selectedRoomId : null 
                 })}
-                disabled={cartItems.length === 0 || (orderType === 'Dine-in' && !selectedTableId) || (orderType === 'Room Dining' && !deliveryLocation)}
+                disabled={
+                    cartItems.length === 0 || 
+                    (orderType === 'Dine-in' && !selectedTableId) || 
+                    (orderType === 'Room Dining' && !selectedRoomId)
+                }
                 className="w-full mt-4 bg-[#0B3D2E] text-white font-bold py-3 rounded-lg hover:bg-[#082f23] transition-colors disabled:bg-gray-400"
               >
                 {isPlacingOrder ? 'Processing...' : 'Proceed to Payment'}
