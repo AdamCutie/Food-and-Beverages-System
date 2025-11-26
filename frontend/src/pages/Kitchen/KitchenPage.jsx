@@ -141,88 +141,88 @@ const styles = {
     justifyContent: 'center',
   },
   filterContainer: {
-  backgroundColor: '#fff2e0', // Dark brown background
-  padding: '16px',
-  borderRadius: '0.5rem',
-  marginBottom: '24px',
-  display: 'flex',
-  flexDirection: 'row',
-  justifyContent: 'space-around',
-  gap: '16px',
-},
-filterBox: {
-  display: 'flex',
-  flexDirection: 'column',
-  width: '33.33%', // Each filter takes up 1/3 of the container
-},
-filterLabel: {
-  fontSize: '0.875rem',
-  fontWeight: '600',
-  marginBottom: '4px',
-  color: 'brown', // Use the accent orange for the label
-},
-filterSelect: {
-  padding: '10px',
-  border: '1px solid #ffffff', // A lighter brown border
-  borderRadius: '0.375rem',
-  backgroundColor: '#ffffff', // A slightly lighter brown for the box
-  color: 'brown', // White text
-  fontSize: '1rem',
-  cursor: 'pointer',
-},
-summaryCardContainer: {
-  display: 'flex',
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  gap: '16px',
-  marginBottom: '24px',
-},
-summaryCard: {
-  backgroundColor: '#FAEBD7', // The new light cream background
-  borderRadius: '1rem', // 16px, for the high rounding
-  padding: '16px',
-  flex: 1, // Makes all 4 cards share the space equally
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-},
-summaryCardContent: {
+    backgroundColor: '#fff2e0', // Dark brown background
+    padding: '16px',
+    borderRadius: '0.5rem',
+    marginBottom: '24px',
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: '16px',
+  },
+  filterBox: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '33.33%', // Each filter takes up 1/3 of the container
+  },
+  filterLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    marginBottom: '4px',
+    color: 'brown', // Use the accent orange for the label
+  },
+  filterSelect: {
+    padding: '10px',
+    border: '1px solid #ffffff', // A lighter brown border
+    borderRadius: '0.375rem',
+    backgroundColor: '#ffffff', // A slightly lighter brown for the box
+    color: 'brown', // White text
+    fontSize: '1rem',
+    cursor: 'pointer',
+  },
+  summaryCardContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: '16px',
+    marginBottom: '24px',
+  },
+  summaryCard: {
+    backgroundColor: '#FAEBD7', // The new light cream background
+    borderRadius: '1rem', // 16px, for the high rounding
+    padding: '16px',
+    flex: 1, // Makes all 4 cards share the space equally
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+  },
+  summaryCardContent: {
 
-},
-summaryCardTitle: {
-  color: '#3C2A21', 
-  fontSize: '0.875rem',
-  fontWeight: '600',
-  textTransform: 'uppercase',
-},
-summaryCardCount: {
-  color: '#3C2A21', // Dark brown text
-  fontSize: '2.25rem',
-  fontWeight: 'bold',
-},
-summaryIconWrapper: {
-  width: '48px',
-  height: '48px',
-  borderRadius: '50%', // Circle
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: 'white',
-},
+  },
+  summaryCardTitle: {
+    color: '#3C2A21', 
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  summaryCardCount: {
+    color: '#3C2A21', // Dark brown text
+    fontSize: '2.25rem',
+    fontWeight: 'bold',
+  },
+  summaryIconWrapper: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '50%', // Circle
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+  },
 
-iconPending: {
-  backgroundColor: '#F59E0B', // Amber/Yellow
-},
-iconPreparing: {
-  backgroundColor: '#3B82F6', // Blue
-},
-iconReady: {
-  backgroundColor: '#10B981', // Green
-},
-iconServed: {
-  backgroundColor: '#6B7280', // Gray
-},
+  iconPending: {
+    backgroundColor: '#F59E0B', // Amber/Yellow
+  },
+  iconPreparing: {
+    backgroundColor: '#3B82F6', // Blue
+  },
+  iconReady: {
+    backgroundColor: '#10B981', // Green
+  },
+  iconServed: {
+    backgroundColor: '#6B7280', // Gray
+  },
 };
 
 
@@ -238,8 +238,7 @@ function KitchenPage() {
 
   const fetchOrderDetails = async (orderId) => {
     try {
-      // --- 2. USE apiClient ---
-      const response = await apiClient(`/orders/${orderId}`); // No headers
+      const response = await apiClient(`/orders/${orderId}`); 
       if (!response.ok) {
         console.error(`Failed to fetch details for order ${orderId}`);
         return null;
@@ -260,12 +259,10 @@ function KitchenPage() {
     setError(null);
 
     try {
-      // --- 1. NEW: Use Promise.all to fetch both endpoints ---
       const [kitchenResponse, servedResponse] = await Promise.all([
-        apiClient('/orders/kitchen'), // The orders we display
-        apiClient('/orders/served')  // The orders we just want to count
+        apiClient('/orders/kitchen'),
+        apiClient('/orders/served') 
       ]);
-      // --- END OF NEW CODE ---
 
       if (!kitchenResponse.ok) {
         throw new Error('Failed to fetch kitchen orders list');
@@ -275,20 +272,12 @@ function KitchenPage() {
       }
 
       const ordersList = await kitchenResponse.json();
-      const servedList = await servedResponse.json(); // --- NEW: Get served list
+      const servedList = await servedResponse.json(); 
 
-      if (!Array.isArray(ordersList)) {
-          console.error("API (kitchen) did not return an array, received:", ordersList);
-          throw new Error("Invalid data from server (kitchen).");
-      }
-      if (!Array.isArray(servedList)) {
-          console.error("API (served) did not return an array, received:", servedList);
-          throw new Error("Invalid data from server (served).");
-      }
+      if (!Array.isArray(ordersList)) throw new Error("Invalid data from server (kitchen).");
+      if (!Array.isArray(servedList)) throw new Error("Invalid data from server (served).");
 
-      // --- 2. NEW: Set the served count from the list's length ---
       setServedCount(servedList.length);
-      // --- END OF NEW CODE ---
 
       const ordersWithDetails = await Promise.all(
         ordersList.map(order => fetchOrderDetails(order.order_id))
@@ -299,7 +288,6 @@ function KitchenPage() {
       if (Array.isArray(newOrders)) {
           setKitchenOrders(newOrders);
       } else {
-          console.error("Error: newOrders is not an array.", newOrders);
           setKitchenOrders([]); 
       }
     } catch (err) {
@@ -316,10 +304,8 @@ function KitchenPage() {
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      // --- 4. USE apiClient ---
       const response = await apiClient(`/orders/${orderId}/status`, {
         method: 'PUT',
-        // No headers
         body: JSON.stringify({ status: newStatus.toLowerCase() }),
       });
 
@@ -330,11 +316,8 @@ function KitchenPage() {
       }
 
       setKitchenOrders(currentOrders => {
-        // ... (rest of function is unchanged) ...
-        if (!Array.isArray(currentOrders)) {
-            console.error("Error: kitchenOrders state was not an array during update.");
-            return []; 
-        }
+        if (!Array.isArray(currentOrders)) return []; 
+        
         if (newStatus.toLowerCase() === 'served' || newStatus.toLowerCase() === 'cancelled') {
           return currentOrders.filter(order => order.order_id !== orderId);
         } else {
@@ -352,7 +335,6 @@ function KitchenPage() {
     }
   };
 
-  // ... (useEffect and JSX render logic is unchanged) ...
   useEffect(() => {
     fetchAndPopulateOrders(true);
     const intervalId = setInterval(() => {
@@ -361,14 +343,7 @@ function KitchenPage() {
     return () => clearInterval(intervalId);
   }, []);
 
-  if (loading) {
-    return <div className="p-8 text-center text-lg">Loading active orders...</div>;
-  }
-
-  if (error && kitchenOrders.length === 0) {
-    return <div className="p-8 text-center text-red-500">Error: {error}</div>;
-  }
-
+  // --- Calculations moved here to be accessible in the main return ---
   const filteredOrders = Array.isArray(kitchenOrders) ? kitchenOrders.filter(order => {
     const statusMatch = filterStatus === 'All' || (order.status && order.status.toLowerCase() === filterStatus.toLowerCase());
     const typeMatch = filterType === 'All Types' || (order.order_type && order.order_type.toLowerCase() === filterType.toLowerCase());
@@ -381,222 +356,227 @@ function KitchenPage() {
   
   return (
     <>
+    {/* Navbar always displays now */}
     <InternalNavBar />
-<div style={pageContainerStyle}>
-  <div style={{ maxWidth: '1280px', margin: '0 auto' }}> 
-    <h1 style={pageTitleStyle}>Kitchen Order Display</h1>
-
-<div style={styles.summaryCardContainer}>
-  {/* Pending Card */}
-  <div style={styles.summaryCard}>
-    <div style={styles.summaryCardContent}>
-      <h3 style={styles.summaryCardTitle}>Pending</h3>
-      <p style={styles.summaryCardCount}>{pendingCount}</p>
-    </div>
-    <div style={{...styles.summaryIconWrapper, ...styles.iconPending}}>
-      <Clock size={24} />
-    </div>
-  </div>
-
-  {/* Preparing Card */}
-  <div style={styles.summaryCard}>
-    <div style={styles.summaryCardContent}>
-      <h3 style={styles.summaryCardTitle}>Preparing</h3>
-      <p style={styles.summaryCardCount}>{preparingCount}</p>
-    </div>
-    <div style={{...styles.summaryIconWrapper, ...styles.iconPreparing}}>
-      <Package size={24} />
-    </div>
-  </div>
-
-  {/* Ready Card */}
-  <div style={styles.summaryCard}>
-    <div style={styles.summaryCardContent}>
-      <h3 style={styles.summaryCardTitle}>Ready</h3>
-      <p style={styles.summaryCardCount}>{readyCount}</p>
-    </div>
-    <div style={{...styles.summaryIconWrapper, ...styles.iconReady}}>
-      <CheckCircle size={24} />
-    </div>
-  </div>
-
-  {/* Served Card */}
-  <div style={styles.summaryCard}>
-    <div style={styles.summaryCardContent}>
-      <h3 style={styles.summaryCardTitle}>Served</h3>
-      <p style={styles.summaryCardCount}>{servedCount}</p>
-    </div>
-    <div style={{...styles.summaryIconWrapper, ...styles.iconServed}}>
-      <CheckCircle2 size={24} />
-    </div>
-  </div>
-</div>
-        
-        {error && <p className="text-center text-red-500 text-sm mb-4">Error fetching updates: {error}</p>}
-
-        <div style={styles.filterContainer}>
-  <div style={styles.filterBox}>
-    <label htmlFor="status-filter" style={styles.filterLabel}>Filter by Status</label>
-    <select
-      id="status-filter"
-      value={filterStatus}
-      onChange={(e) => setFilterStatus(e.target.value)}
-      style={styles.filterSelect}
-    >
-      <option value="All">All</option>
-      <option value="Pending">Pending</option>
-      <option value="Preparing">Preparing</option>
-      <option value="Ready">Ready</option>
-    </select>
-  </div>
-
-  <div style={styles.filterBox}>
-    <label htmlFor="type-filter" style={styles.filterLabel}>Filter by Type</label>
-    <select
-      id="type-filter"
-      value={filterType}
-      onChange={(e) => setFilterType(e.target.value)}
-      style={styles.filterSelect}
-    >
-      <option value="All Types">All Types</option>
-      <option value="Dine-in">Dine-in</option>
-      <option value="Room Dining">Room Dining</option>
-      <option value="Walk-in">Walk-in</option>
-      <option value="Phone Order">Phone Order</option>
-    </select>
-  </div>
-</div>
-
-        {filteredOrders.length === 0 ? (
-          <p className="text-center text-gray-500 mt-10">
-            No {filterStatus !== 'All' ? filterStatus.toLowerCase() + ' ' : ''}
-            {filterType !== 'All Types' ? filterType.toLowerCase() + ' ' : ''}
-            orders.
-          </p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-  {filteredOrders.map(order => {
     
-    // --- THIS IS THE NEW LINE ---
-    const orderInstructions = order.items && order.items.length > 0 ? order.items[0].instructions : null;
+    <div style={pageContainerStyle}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto' }}> 
+        <h1 style={pageTitleStyle}>Kitchen Order Display</h1>
 
-    return (
-      <div key={order.order_id} style={styles.card}>
-
-        {/* ---- CARD HEADER ---- */}
-        <div style={styles.cardHeader}>
-          {/* Status Tag (Top Right) */}
-          <span style={getStatusStyles(order.status)}>
-            {order.status}
-          </span>
-          {/* Title */}
-          <h2 style={styles.cardTitle}>Order #{order.order_id}</h2>
-          <p style={styles.cardTime}>
-            Time: {new Date(order.order_date).toLocaleTimeString()}
-          </p>
-        </div>
-
-        {/* ---- CARD BODY ---- */}
-      <div style={styles.cardBody}>
-        {/* Info Section */}
-        <div>
-          <p style={styles.infoLine}>
-            <span style={styles.infoLabel}>Type: </span>{order.order_type}
-          </p>
-          <p style={styles.infoLine}>
-            <span style={styles.infoLabel}>Location: </span>{order.delivery_location}
-          </p>
-          <p style={styles.infoLine}>
-            <span style={styles.infoLabel}>Customer: </span>{order.first_name} {order.last_name}
-          </p>
-        </div>
-
-        {/* Items Section (Instructions REMOVED from loop) */}
-        <div style={styles.itemsListContainer}>
-          <h3 style={styles.itemsListTitle}>Items:</h3>
-          {order.items && order.items.length > 0 ? (
-            order.items.map(item => (
-              <div key={item.detail_id} style={styles.itemEntry}>
-                <span style={styles.itemName}>{item.quantity} x {item.item_name}</span>
-                {/* Instruction <p> tag is removed from here */}
-              </div>
-            ))
-          ) : (
-            <p style={styles.infoLine}>No item details found.</p>
-          )}
-        </div>
-
-        {/* --- NEW Special Instructions Section --- */}
-        {orderInstructions && (
-          <div style={{ marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '8px' }}>
-            <h3 style={styles.itemsListTitle}>Instructions:</h3>
-            <p style={{...styles.itemInstructions, marginLeft: 0, fontSize: '0.875rem', color: '#EF4444'}}>
-              {orderInstructions}
-            </p>
-          </div>
-        )}
-        {/* --- END of new section --- */}
-
-      </div>
-
-        {/* ---- CARD FOOTER (BUTTONS) ---- */}
-        <div style={styles.cardFooter}>
-
-          {/* --- PENDING --- */}
-          {order.status.toLowerCase() === 'pending' && (
-            <div style={styles.buttonRow}>
-              <button
-                onClick={() => handleUpdateStatus(order.order_id, 'Preparing')}
-                style={{...styles.primaryButton, backgroundColor: '#16A34A'}} // Green
-              >
-                Accept (Prepare)
-              </button>
-              <button
-                onClick={() => handleUpdateStatus(order.order_id, 'Cancelled')}
-                style={styles.iconButton}
-                title="Cancel Order"
-              >
-                <Trash2 size={20} />
-              </button>
+        {/* === LOADING STATE === */}
+        {loading ? (
+            <div className="p-8 text-center text-lg" style={{ color: '#ffffff' }}>
+                Loading active orders...
             </div>
-          )}
+        ) : (
+            /* === CONTENT STATE === */
+            <>
+                {/* ERROR MESSAGE */}
+                {error && kitchenOrders.length === 0 && (
+                    <div className="p-8 text-center text-red-500 bg-white rounded-lg mb-6">
+                        Error: {error}
+                    </div>
+                )}
 
-          {/* --- PREPARING --- */}
-          {order.status.toLowerCase() === 'preparing' && (
-            <div style={styles.buttonRow}>
-              <button
-                onClick={() => handleUpdateStatus(order.order_id, 'Ready')}
-                style={{...styles.primaryButton, backgroundColor: '#3B82F6'}} // Blue
-              >
-                Mark as Ready
-              </button>
-              <button
-                onClick={() => handleUpdateStatus(order.order_id, 'Cancelled')}
-                style={styles.iconButton}
-                title="Cancel Order"
-              >
-                <Trash2 size={20} />
-              </button>
-            </div>
-          )}
+                <div style={styles.summaryCardContainer}>
+                    {/* Pending Card */}
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryCardContent}>
+                        <h3 style={styles.summaryCardTitle}>Pending</h3>
+                        <p style={styles.summaryCardCount}>{pendingCount}</p>
+                        </div>
+                        <div style={{...styles.summaryIconWrapper, ...styles.iconPending}}>
+                        <Clock size={24} />
+                        </div>
+                    </div>
 
-          {/* --- READY --- */}
-          {order.status.toLowerCase() === 'ready' && (
-            <div style={styles.buttonRow}>
-              <button
-                onClick={() => handleUpdateStatus(order.order_id, 'Served')}
-                style={{...styles.primaryButton, backgroundColor: '#F59E0B'}} // Amber
-              >
-                Mark as Served
-              </button>
-            </div>
-          )}
+                    {/* Preparing Card */}
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryCardContent}>
+                        <h3 style={styles.summaryCardTitle}>Preparing</h3>
+                        <p style={styles.summaryCardCount}>{preparingCount}</p>
+                        </div>
+                        <div style={{...styles.summaryIconWrapper, ...styles.iconPreparing}}>
+                        <Package size={24} />
+                        </div>
+                    </div>
 
-        </div>
-      </div>
-    )
-  })}
-</div>
+                    {/* Ready Card */}
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryCardContent}>
+                        <h3 style={styles.summaryCardTitle}>Ready</h3>
+                        <p style={styles.summaryCardCount}>{readyCount}</p>
+                        </div>
+                        <div style={{...styles.summaryIconWrapper, ...styles.iconReady}}>
+                        <CheckCircle size={24} />
+                        </div>
+                    </div>
+
+                    {/* Served Card */}
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryCardContent}>
+                        <h3 style={styles.summaryCardTitle}>Served</h3>
+                        <p style={styles.summaryCardCount}>{servedCount}</p>
+                        </div>
+                        <div style={{...styles.summaryIconWrapper, ...styles.iconServed}}>
+                        <CheckCircle2 size={24} />
+                        </div>
+                    </div>
+                </div>
+                        
+                {/* Soft Error (Polling failure) */}
+                {error && kitchenOrders.length > 0 && (
+                    <p className="text-center text-red-400 text-sm mb-4">
+                        Connection lost. Retrying...
+                    </p>
+                )}
+
+                <div style={styles.filterContainer}>
+                    <div style={styles.filterBox}>
+                        <label htmlFor="status-filter" style={styles.filterLabel}>Filter by Status</label>
+                        <select
+                        id="status-filter"
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        style={styles.filterSelect}
+                        >
+                        <option value="All">All</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Preparing">Preparing</option>
+                        <option value="Ready">Ready</option>
+                        </select>
+                    </div>
+
+                    <div style={styles.filterBox}>
+                        <label htmlFor="type-filter" style={styles.filterLabel}>Filter by Type</label>
+                        <select
+                        id="type-filter"
+                        value={filterType}
+                        onChange={(e) => setFilterType(e.target.value)}
+                        style={styles.filterSelect}
+                        >
+                        <option value="All Types">All Types</option>
+                        <option value="Dine-in">Dine-in</option>
+                        <option value="Room Dining">Room Dining</option>
+                        <option value="Walk-in">Walk-in</option>
+                        <option value="Phone Order">Phone Order</option>
+                        </select>
+                    </div>
+                </div>
+
+                {filteredOrders.length === 0 ? (
+                    <p className="text-center text-gray-400 mt-10 text-lg">
+                        No {filterStatus !== 'All' ? filterStatus.toLowerCase() + ' ' : ''}
+                        {filterType !== 'All Types' ? filterType.toLowerCase() + ' ' : ''}
+                        orders.
+                    </p>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
+                        {filteredOrders.map(order => {
+                            const orderInstructions = order.items && order.items.length > 0 ? order.items[0].instructions : null;
+
+                            return (
+                            <div key={order.order_id} style={styles.card}>
+                                <div style={styles.cardHeader}>
+                                    <span style={getStatusStyles(order.status)}>
+                                        {order.status}
+                                    </span>
+                                    <h2 style={styles.cardTitle}>Order #{order.order_id}</h2>
+                                    <p style={styles.cardTime}>
+                                        Time: {new Date(order.order_date).toLocaleTimeString()}
+                                    </p>
+                                </div>
+
+                                <div style={styles.cardBody}>
+                                    <div>
+                                        <p style={styles.infoLine}>
+                                            <span style={styles.infoLabel}>Type: </span>{order.order_type}
+                                        </p>
+                                        <p style={styles.infoLine}>
+                                            <span style={styles.infoLabel}>Location: </span>{order.delivery_location}
+                                        </p>
+                                        <p style={styles.infoLine}>
+                                            <span style={styles.infoLabel}>Customer: </span>{order.first_name} {order.last_name}
+                                        </p>
+                                    </div>
+
+                                    <div style={styles.itemsListContainer}>
+                                        <h3 style={styles.itemsListTitle}>Items:</h3>
+                                        {order.items && order.items.length > 0 ? (
+                                            order.items.map(item => (
+                                            <div key={item.detail_id} style={styles.itemEntry}>
+                                                <span style={styles.itemName}>{item.quantity} x {item.item_name}</span>
+                                            </div>
+                                            ))
+                                        ) : (
+                                            <p style={styles.infoLine}>No item details found.</p>
+                                        )}
+                                    </div>
+
+                                    {orderInstructions && (
+                                        <div style={{ marginTop: '8px', borderTop: '1px solid #E5E7EB', paddingTop: '8px' }}>
+                                            <h3 style={styles.itemsListTitle}>Instructions:</h3>
+                                            <p style={{...styles.itemInstructions, marginLeft: 0, fontSize: '0.875rem', color: '#EF4444'}}>
+                                            {orderInstructions}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div style={styles.cardFooter}>
+                                    {order.status.toLowerCase() === 'pending' && (
+                                        <div style={styles.buttonRow}>
+                                        <button
+                                            onClick={() => handleUpdateStatus(order.order_id, 'Preparing')}
+                                            style={{...styles.primaryButton, backgroundColor: '#16A34A'}} 
+                                        >
+                                            Accept (Prepare)
+                                        </button>
+                                        <button
+                                            onClick={() => handleUpdateStatus(order.order_id, 'Cancelled')}
+                                            style={styles.iconButton}
+                                            title="Cancel Order"
+                                        >
+                                            <Trash2 size={20} />
+                                        </button>
+                                        </div>
+                                    )}
+
+                                    {order.status.toLowerCase() === 'preparing' && (
+                                        <div style={styles.buttonRow}>
+                                        <button
+                                            onClick={() => handleUpdateStatus(order.order_id, 'Ready')}
+                                            style={{...styles.primaryButton, backgroundColor: '#3B82F6'}} 
+                                        >
+                                            Mark as Ready
+                                        </button>
+                                        <button
+                                            onClick={() => handleUpdateStatus(order.order_id, 'Cancelled')}
+                                            style={styles.iconButton}
+                                            title="Cancel Order"
+                                        >
+                                            <Trash2 size={20} />
+                                        </button>
+                                        </div>
+                                    )}
+
+                                    {order.status.toLowerCase() === 'ready' && (
+                                        <div style={styles.buttonRow}>
+                                        <button
+                                            onClick={() => handleUpdateStatus(order.order_id, 'Served')}
+                                            style={{...styles.primaryButton, backgroundColor: '#F59E0B'}} 
+                                        >
+                                            Mark as Served
+                                        </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            )
+                        })}
+                    </div>
+                )}
+            </>
         )}
       </div>
     </div>
