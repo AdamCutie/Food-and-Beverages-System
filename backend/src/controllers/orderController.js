@@ -117,14 +117,19 @@ export const createPosOrder = async (req, res) => {
         await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
 
         // Step 6: Record payment
-        const paymentSql =
-            "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
-        await connection.query(paymentSql, [
-            order_id,
-            payment_method || "Cash",
-            calculatedTotalAmount,
-            change_amount || 0
-        ]);
+        if (payment_method !== 'Pay Later') {
+            const paymentSql =
+                "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
+            await connection.query(paymentSql, [
+                order_id,
+                payment_method || "Cash",
+                calculatedTotalAmount,
+                change_amount || 0
+            ]);
+        } else {
+             // Optional: Log that this is a Pay Later order
+             console.log(`Order ${order_id} created as Pay Later (Unpaid)`);
+        }
 
         await connection.commit();
 

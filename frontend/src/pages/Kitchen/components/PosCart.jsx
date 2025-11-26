@@ -127,12 +127,16 @@ const PosCart = ({
             <span>₱{grandTotal.toFixed(2)}</span>
           </div>
          <button
-        onClick={() => onPlaceOrder(grandTotal)} // Pass the total to the handler
-        disabled={cartItems.length === 0 || !deliveryLocation} // Remove isPlacingOrder
-        className="w-full mt-4 bg-[#F9A825] text-[#3C2A21] font-bold py-3 rounded-lg hover:bg-[#c47b04] transition-colors disabled:bg-gray-400"
+            onClick={() => onPlaceOrder(grandTotal)} 
+            disabled={cartItems.length === 0 || !deliveryLocation}
+            className={`w-full mt-4 font-bold py-3 rounded-lg transition-colors disabled:bg-gray-400 ${
+                orderType === 'Phone Order' 
+                ? 'bg-blue-600 text-white hover:bg-blue-700' // Blue for Phone Orders
+                : 'bg-[#F9A825] text-[#3C2A21] hover:bg-[#c47b04]' // Orange for Walk-in
+            }`}
         >
-            Submit Cash Order
-          </button>
+            {orderType === 'Phone Order' ? 'Place Phone Order (Pay Later)' : 'Proceed to Payment'}
+        </button>
         </div>
       </div>
     </div>
