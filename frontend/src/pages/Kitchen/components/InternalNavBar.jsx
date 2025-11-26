@@ -95,8 +95,8 @@ const InternalNavBar = () => {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
         
-        {/* --- NEW: Conditionally render Admin Dashboard link --- */}
-        {user && user.role === 'admin' && (
+        {/* --- Conditionally render Admin Dashboard link --- */}
+        {user && user.position === 'F&B Admin' && (
           <Link
             to="/admin"
             style={isHovered ? { ...baseAdminLinkStyle, ...hoverAdminLinkStyle } : baseAdminLinkStyle}
@@ -106,7 +106,6 @@ const InternalNavBar = () => {
             Go to Admin Dashboard
           </Link>
         )}
-        {/* --- END OF NEW LINK --- */}
 
         <ProfileDropdown />
       </div>
