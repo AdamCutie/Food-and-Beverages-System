@@ -11,6 +11,7 @@ import InventoryLogsTable from './components/InventoryLogsTable';
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../utils/apiClient';
 import PromotionsManagement from './components/PromotionsManagement'; 
+import TableManagement from './components/TableManagement';
 
 
 
@@ -223,6 +224,19 @@ function AdminPage() {
               Menu Management
             </button>
             <button
+              onClick={() => setCurrentView('tables')}
+              style={{
+                padding: '8px 16px',
+                fontSize: '1.125rem',
+                fontWeight: 600,
+                color: currentView === 'tables' ? accentColor : '#ffffff',
+                borderBottom: currentView === 'tables' ? `2px solid ${accentColor}` : '2px solid transparent'
+              }}
+            >
+              Table Management
+            </button>
+
+            <button
             onClick={() => setCurrentView('promotions')}
             style={{
               padding: '8px 16px',
@@ -282,6 +296,8 @@ function AdminPage() {
             )}
 
             {!loading && !error && currentView === 'logs' && <InventoryLogsTable />}
+
+            {!loading && !error && currentView === 'tables' && <TableManagement />}
           </main>
           
           <AddItemModal

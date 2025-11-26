@@ -2,11 +2,11 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
-import { fileURLToPath } from "url"; // <-- THIS IS THE MISSING LINE
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const envPath = path.resolve(__dirname, '../.env'); // Points to .env in the 'backend' folder
+const envPath = path.resolve(__dirname, '../.env'); 
 dotenv.config({ path: envPath });
 
 import pool from "../src/config/mysql.js";
@@ -14,7 +14,6 @@ import pool from "../src/config/mysql.js";
 // Middleware
 import { notFound, errorHandler } from "../src/middleware/errorMiddleware.js";
 import { apiLimiter, authLimiter } from "../src/middleware/rateLimiter.js";
-
 
 // Routes
 import authRoutes from "../src/routes/authRoutes.js";
@@ -28,9 +27,11 @@ import categoryRoutes from "../src/routes/categoryRoutes.js";
 import analyticsRoutes from "../src/routes/analyticsRoutes.js";
 import dashboardRoutes from "../src/routes/dashboardRoutes.js";
 import notificationRoutes from "../src/routes/notificationRoutes.js";
-import promotionRoutes from "../src/routes/promotionRoutes.js";
+
+// --- NEW ROUTES (Added for Normalization & Promos) ---
 import tableRoutes from "../src/routes/tableRoutes.js";
 import roomRoutes from "../src/routes/roomRoutes.js";
+import promotionRoutes from "../src/routes/promotionRoutes.js";
 
 const app = express();
 app.use(cors());
@@ -46,18 +47,18 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// Para di tamaan ng Rate limiter middleware
+// Routes exempt from strict Rate Limiter
 app.use("/api/orders", orderRoutes);
 app.use("/api/categories", categoryRoutes); 
+app.use("/api/tables", tableRoutes); // Tables (Public for Menu)
+app.use("/api/rooms", roomRoutes);   // Rooms (Public for Menu)
 
-// Apply the general API rate limiter to all requests starting with /api
+// Apply the general API rate limiter to all other requests
 app.use("/api/", apiLimiter);
 
 // API routes
-// Apply the stricter auth limiter specifically to auth routes
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/items", itemRoutes);
-
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use('/api/inventory', inventoryRoutes);
@@ -65,9 +66,8 @@ app.use("/api/analytics", analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/promotions', promotionRoutes);
-app.use('/api/tables', tableRoutes);
-app.use('/api/rooms', roomRoutes);
-app.use('/api/upload', uploadRoutes); // Upload Image route
+app.use('/api/upload', uploadRoutes); 
+
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Error middleware
