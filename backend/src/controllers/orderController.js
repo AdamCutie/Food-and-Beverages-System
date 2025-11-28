@@ -10,15 +10,20 @@ const VAT_RATE = 0.12;     // 12%
 // @access  Private (Staff)
 export const createPosOrder = async (req, res) => {
     const connection = await pool.getConnection();
-    let order_id;
+    // Move order_id declaration here so it's available in catch block if needed (optional)
+    let order_id; 
+
     try {
         await connection.beginTransaction();
 
         // --- 1. GET NEW FIELDS FROM req.body ---
+        // UPDATED: Added client_id and table_id to destructuring
         const { 
           items, order_type, instructions, delivery_location, 
-          payment_method, amount_tendered, change_amount 
+          payment_method, change_amount,
+          client_id, table_id 
         } = req.body;
+
         const [empRows] = await connection.query("SELECT employee_id FROM employees WHERE user_id = ?", [req.user.id]);
         
         if (empRows.length === 0) {
@@ -29,13 +34,19 @@ export const createPosOrder = async (req, res) => {
         // Step 1: Validate stock
         await validateStock(items, connection);
 
-        // Step 2: Calculate totals with promo support
-        let calculatedItemsTotal = 0; 
+        // Step 2: Create the order
+        // We set totals to 0 initially, they are updated in Step 3
+        const orderSql = "INSERT INTO fb_orders (client_id, employee_id, order_type, delivery_location, table_id, status, items_total, service_charge_amount, vat_amount, total_amount) VALUES (?, ?, ?, ?, ?, 'pending', 0, 0, 0, 0)";
         
-       const orderSql = "INSERT INTO fb_orders (client_id, staff_id, order_type, delivery_location, table_id, status) VALUES (?, ?, ?, ?, ?, 'pending')";
-        // Note: Make sure you are passing table_id in the values array above if you haven't already updated this query
-        const [orderResult] = await connection.query(orderSql, [client_id, employee_id, order_type, deliveryLocation, table_id]); 
-        const order_id = orderResult.insertId;
+        // UPDATED: Use client_id || null, fixed delivery_location variable name
+        const [orderResult] = await connection.query(orderSql, [
+            client_id || null, 
+            employee_id, 
+            order_type, 
+            delivery_location, 
+            table_id || null
+        ]); 
+        order_id = orderResult.insertId; // Assign to the outer variable
 
         // --- NEW LOGIC: Set Table to Occupied ---
         if (table_id) {
@@ -46,6 +57,8 @@ export const createPosOrder = async (req, res) => {
         }
         
         // Step 3: Calculate totals and create order details
+        let calculatedItemsTotal = 0; 
+
         for (const item of items) {
             // 1. Fetch the item's price AND promo details
             const [rows] = await connection.query(
@@ -60,6 +73,8 @@ export const createPosOrder = async (req, res) => {
                  WHERE mi.item_id = ?`, 
                 [item.item_id]
             );
+
+            if (rows.length === 0) continue; // Skip if item not found
 
             const dbItem = rows[0];
             let actualPrice = parseFloat(dbItem.price); // Start with the original price
@@ -94,9 +109,7 @@ export const createPosOrder = async (req, res) => {
         const calculatedVatAmount = (calculatedItemsTotal + calculatedServiceCharge) * VAT_RATE; 
         const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
 
-        // BUG FIX #3: Update order with calculated totals
-        // WHY: We created the order with 0 values, now we need to update with actual calculated amounts
-        // HOW: Run an UPDATE query after all calculations are complete
+        // Step 3.1: Update order with calculated totals
         await connection.query(
             `UPDATE fb_orders 
              SET items_total = ?, service_charge_amount = ?, vat_amount = ?, total_amount = ? 
@@ -134,14 +147,14 @@ export const createPosOrder = async (req, res) => {
         });
 
     } catch (error) {
-        await connection.rollback();
+        if (connection) await connection.rollback();
         console.error("CREATE POS ORDER ERROR:", error);
         if (error.message.startsWith("Not enough stock")) {
             return res.status(400).json({ message: error.message });
         }
         res.status(500).json({ message: "Failed to create order", error: error.message });
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 };
 
