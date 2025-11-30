@@ -185,11 +185,17 @@ export const createPayMongoPayment = async (req, res) => {
 // @desc    PayMongo Webhook Handler - CREATES order after payment
 // @route   POST /api/payments/webhook
 // @access  Public (verified by signature)
-
 export const paymongoWebhook = async (req, res) => {
     const connection = await pool.getConnection();
     try {
-        console.log('Webhook received:', req.body.data?.attributes?.type);
+        // Convert raw buffer to string for signature verification
+        const bodyString = req.body.toString('utf8');
+        
+        // Parse the body for processing
+        const parsedBody = JSON.parse(bodyString);
+
+        console.log('=== WEBHOOK DEBUG ===');
+        console.log('Webhook received:', parsedBody.data?.attributes?.type);
 
         // Verify webhook signature
         const signatureHeader = req.headers['paymongo-signature'];
@@ -210,9 +216,6 @@ export const paymongoWebhook = async (req, res) => {
         const timestamp = signatureParts.t;
         const receivedSignature = signatureParts.te;
 
-        // Use raw body for signature verification
-        const bodyString = req.rawBody || JSON.stringify(req.body);
-        
         // PayMongo signature format: timestamp.payload
         const signedPayload = `${timestamp}.${bodyString}`;
         
@@ -223,6 +226,7 @@ export const paymongoWebhook = async (req, res) => {
 
         console.log('Received signature:', receivedSignature);
         console.log('Computed signature:', computedSignature);
+        console.log('Match:', receivedSignature === computedSignature);
 
         if (receivedSignature !== computedSignature) {
             console.error('Invalid webhook signature');
@@ -236,7 +240,7 @@ export const paymongoWebhook = async (req, res) => {
             return res.status(401).json({ message: "Webhook timestamp expired" });
         }
 
-        const event = req.body;
+        const event = parsedBody; // Use parsedBody instead of req.body
 
         // Handle payment.paid event
         if (event.data.attributes.type === 'payment.paid') {
