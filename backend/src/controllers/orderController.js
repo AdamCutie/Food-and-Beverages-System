@@ -167,7 +167,7 @@ export const createOrder = async (req, res) => {
         await connection.beginTransaction();
 
         const client_id = req.user.id; 
-        const { items, order_type, delivery_location, table_id, room_id } = req.body;
+        const { items, order_type, delivery_location, table_id, room_id, instructions } = req.body;
 
         if (!items || items.length === 0) {
             throw new Error("Missing required order information.");
