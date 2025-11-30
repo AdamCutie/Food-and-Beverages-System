@@ -35,20 +35,18 @@ import promotionRoutes from "../src/routes/promotionRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 
 const app = express();
+
 if (process.env.NODE_ENV !== "production") {
-app.use(cors({
-  origin:"http://localhost:21917",
-  })
-);
+  app.use(cors({
+    origin:"http://localhost:21917",
+  }));
 }
-// Use raw body buffer for webhook signature verification
-app.use(express.json({
-  verify: (req, res, buf, encoding) => {
-    if (req.originalUrl === '/api/payments/webhook') {
-      req.rawBody = buf.toString(encoding || 'utf8');
-    }
-  }
-}));
+
+// CRITICAL: Webhook route with raw body parser MUST come BEFORE express.json()
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }), paymentRoutes);
+
+// Now apply JSON parsing for all other routes
+app.use(express.json());
 
 // Test DB Connection
 app.get("/api/health", async (req, res) => {
@@ -72,7 +70,7 @@ app.use("/api/", apiLimiter);
 // API routes
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/items", itemRoutes);
-app.use("/api/payments", paymentRoutes);
+app.use("/api/payments", paymentRoutes); // Note: This handles non-webhook payment routes
 app.use("/api/admin", adminRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use("/api/analytics", analyticsRoutes); 
@@ -87,9 +85,9 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 if(process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname,"../../frontend/dist")))
 
-app.get("*",(req,res)=>{
-  res.sendFile(path.join(__dirname,"../../frontend","dist","index.html"))
-})
+  app.get("*",(req,res)=>{
+    res.sendFile(path.join(__dirname,"../../frontend","dist","index.html"))
+  })
 }
 
 // Error middleware
