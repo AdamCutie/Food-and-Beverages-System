@@ -39,7 +39,8 @@ export const createPayMongoPayment = async (req, res) => {
                 item_id: item.item_id,
                 item_name: menuItem[0].item_name,
                 quantity: item.quantity,
-                price_on_purchase: price
+                price_on_purchase: price,
+                instructions: item.instructions || '' // <--- ADD THIS LINE
             });
         }
 
@@ -307,15 +308,20 @@ export const paymongoWebhook = async (req, res) => {
             if (order_items.length > 0) {
                 const orderDetailsSql = `
                     INSERT INTO fb_order_details 
-                    (order_id, item_id, quantity, price_on_purchase) 
-                    VALUES (?, ?, ?, ?)
+                    (order_id, item_id, quantity, price_on_purchase, subtotal, instructions) 
+                    VALUES (?, ?, ?, ?, ?, ?)
                 `;
                 for (const item of order_items) {
+                    // ✅ CALCULATE SUBTOTAL
+                    const itemSubtotal = item.quantity * item.price_on_purchase;
+
                     await connection.query(orderDetailsSql, [
                         new_order_id,
                         item.item_id,
                         item.quantity,
-                        item.price_on_purchase
+                        item.price_on_purchase,
+                        itemSubtotal, // ✅ Pass the calculated value here
+                        item.instructions || '' // ✅ Saves the specific note
                     ]);
                 }
             }

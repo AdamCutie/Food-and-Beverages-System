@@ -224,7 +224,8 @@ const handleConfirmPayment = async (paymentInfo) => {
     const checkoutData = {
       cart_items: cartItems.map(item => ({
         item_id: item.item_id,
-        quantity: item.quantity
+        quantity: item.quantity,
+        instructions: item.instructions || '' // <--- ADD THIS LINE
       })),
       
       // Send the specific IDs
