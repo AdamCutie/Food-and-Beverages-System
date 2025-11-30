@@ -34,7 +34,14 @@ import roomRoutes from "../src/routes/roomRoutes.js";
 import promotionRoutes from "../src/routes/promotionRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 
-const app = express();
+// Use raw body buffer for webhook signature verification
+app.use(express.json({
+  verify: (req, res, buf, encoding) => {
+    if (req.originalUrl === '/api/payments/webhook') {
+      req.rawBody = buf.toString(encoding || 'utf8');
+    }
+  }
+}));
 
 if (process.env.NODE_ENV !== "production") {
   app.use(cors({

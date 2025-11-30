@@ -188,17 +188,10 @@ export const createPayMongoPayment = async (req, res) => {
 export const paymongoWebhook = async (req, res) => {
     const connection = await pool.getConnection();
     try {
-        // Convert raw buffer to string for signature verification
-        const bodyString = req.body.toString('utf8');
-        
-        // Parse the body for processing
-        const parsedBody = JSON.parse(bodyString);
-
-        console.log('=== WEBHOOK DEBUG ===');
-        console.log('Webhook received:', parsedBody.data?.attributes?.type);
+        console.log('Webhook received:', req.body.data?.attributes?.type);
 
         // Verify webhook signature
-        const signatureHeader = req.headers['paymongo-signature'];
+        const signature = req.headers['paymongo-signature'];
         const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
         
         if (!webhookSecret) {
@@ -206,40 +199,22 @@ export const paymongoWebhook = async (req, res) => {
             return res.status(500).json({ message: "Webhook not configured" });
         }
 
-        // Parse PayMongo signature format: t=timestamp,te=signature,li=livemode
-        const signatureParts = {};
-        signatureHeader.split(',').forEach(part => {
-            const [key, value] = part.split('=');
-            signatureParts[key] = value;
-        });
-
-        const timestamp = signatureParts.t;
-        const receivedSignature = signatureParts.te;
-
-        // PayMongo signature format: timestamp.payload
-        const signedPayload = `${timestamp}.${bodyString}`;
+        // Use raw body for signature verification (important!)
+        const bodyString = req.rawBody || JSON.stringify(req.body);
         
         const computedSignature = crypto
             .createHmac('sha256', webhookSecret)
-            .update(signedPayload)
+            .update(bodyString)
             .digest('hex');
 
-        console.log('Received signature:', receivedSignature);
+        console.log('Received signature:', signature);
         console.log('Computed signature:', computedSignature);
-        console.log('Match:', receivedSignature === computedSignature);
 
-        if (receivedSignature !== computedSignature) {
+        if (signature !== computedSignature) {
             console.error('Invalid webhook signature');
             return res.status(401).json({ message: "Invalid webhook signature" });
         }
-
-        // Optional: Check timestamp to prevent replay attacks (within 5 minutes)
-        const currentTime = Math.floor(Date.now() / 1000);
-        if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
-            console.error('Webhook timestamp too old');
-            return res.status(401).json({ message: "Webhook timestamp expired" });
-        }
-
+        
         const event = parsedBody; // Use parsedBody instead of req.body
 
         // Handle payment.paid event
