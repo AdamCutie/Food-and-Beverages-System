@@ -208,13 +208,29 @@ const handleConfirmPayment = async (paymentInfo) => {
       toast.loading('Creating checkout...');
     }, 0);
 
-    // ✅ NEW: Send cart data directly to checkout endpoint
+    // --- LOGIC TO SEPARATE TABLE AND ROOM ---
+    let tableIdToSend = null;
+    let roomIdToSend = null;
+
+    // Assuming 'deliveryLocation' holds the ID selected in the CartPanel
+    if (orderType === 'Dine-in') {
+        tableIdToSend = deliveryLocation; 
+    } else if (orderType === 'Room Dining' || orderType === 'Room Service') {
+        // Make sure this string matches exactly what is in your CartPanel options
+        roomIdToSend = deliveryLocation;
+    }
+
+    // ✅ UPDATED: Send table_id and room_id explicitly
     const checkoutData = {
       cart_items: cartItems.map(item => ({
         item_id: item.item_id,
         quantity: item.quantity
       })),
-      table_number: orderType === 'Dine-in' ? deliveryLocation : null,
+      
+      // Send the specific IDs
+      table_id: tableIdToSend, 
+      room_id: roomIdToSend,
+
       special_instructions: cartItems
         .filter(item => item.instructions)
         .map(item => `${item.item_name}: ${item.instructions}`)
@@ -225,7 +241,6 @@ const handleConfirmPayment = async (paymentInfo) => {
       toast.dismiss();
       toast.loading('Creating PayMongo checkout...');
 
-      // ✅ NEW: Single endpoint that creates PayMongo link (no order created yet)
       const paymentResponse = await apiClient('/payments/checkout', {
         method: 'POST',
         headers: {
@@ -243,12 +258,8 @@ const handleConfirmPayment = async (paymentInfo) => {
       toast.dismiss();
       toast.success('Redirecting to PayMongo...');
 
-      // Redirect to PayMongo checkout
       if (paymentResult.checkout_url) {
-        // Clear cart before redirect (order will be created after payment)
         setCartItems([]);
-        
-        // Redirect to PayMongo
         window.location.href = paymentResult.checkout_url;
       } else {
         throw new Error("Missing checkout URL from PayMongo.");
