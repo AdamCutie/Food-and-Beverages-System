@@ -41,7 +41,14 @@ app.use(cors({
   })
 );
 }
-app.use(express.json());
+// Use raw body buffer for webhook signature verification
+app.use(express.json({
+  verify: (req, res, buf, encoding) => {
+    if (req.originalUrl === '/api/payments/webhook') {
+      req.rawBody = buf.toString(encoding || 'utf8');
+    }
+  }
+}));
 
 // Test DB Connection
 app.get("/api/health", async (req, res) => {

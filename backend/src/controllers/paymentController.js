@@ -185,6 +185,7 @@ export const createPayMongoPayment = async (req, res) => {
 // @desc    PayMongo Webhook Handler - CREATES order after payment
 // @route   POST /api/payments/webhook
 // @access  Public (verified by signature)
+
 export const paymongoWebhook = async (req, res) => {
     const connection = await pool.getConnection();
     try {
@@ -199,15 +200,22 @@ export const paymongoWebhook = async (req, res) => {
             return res.status(500).json({ message: "Webhook not configured" });
         }
 
+        // Use raw body for signature verification (important!)
+        const bodyString = req.rawBody || JSON.stringify(req.body);
+        
         const computedSignature = crypto
             .createHmac('sha256', webhookSecret)
-            .update(JSON.stringify(req.body))
+            .update(bodyString)
             .digest('hex');
+
+        console.log('Received signature:', signature);
+        console.log('Computed signature:', computedSignature);
 
         if (signature !== computedSignature) {
             console.error('Invalid webhook signature');
             return res.status(401).json({ message: "Invalid webhook signature" });
         }
+
 
         const event = req.body;
 
