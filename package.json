@@ -4,8 +4,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
-    "start":"npm run start --prefix backend"
-
+    "start": "npm run start --prefix backend"
   },
   "repository": {
     "type": "git",
@@ -18,5 +17,9 @@
     "url": "https://github.com/Nishidell/Food-and-Beverages-System/issues"
   },
   "homepage": "https://github.com/Nishidell/Food-and-Beverages-System#readme",
-  "description": ""
+  "description": "",
+  
+  "engines": {
+    "node": "20.x"
+  }
 }
