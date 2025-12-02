@@ -42,11 +42,26 @@ const app = express();
 // This prevents the "X-Forwarded-For" crash
 app.set('trust proxy', 1); 
 
-if (process.env.NODE_ENV !== "production") {
-  app.use(cors({
-    origin:"http://localhost:21917",
-  }));
-}
+// CORS Configuration - works for both development and production
+const allowedOrigins = [
+  'http://localhost:5173',   // Frontend Vite dev server
+  'http://localhost:21917',  // Backend (for testing)
+  'https://food-and-beverages-system.onrender.com'  // Production
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, same-origin)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'CORS policy does not allow access from this origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
 
 // --- 2. FIX: Webhook Route Placement ---
 // Must define this BEFORE express.json()

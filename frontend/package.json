@@ -28,6 +28,6 @@
     "recharts": "^3.3.0"
   },
   "optionalDependencies": {
-  "@rollup/rollup-linux-x64-gnu": "4.20.0"
+    "@rollup/rollup-linux-x64-gnu": "4.20.0"
   }
 }
