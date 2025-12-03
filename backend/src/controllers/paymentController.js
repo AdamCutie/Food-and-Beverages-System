@@ -316,6 +316,31 @@ export const paymongoWebhook = async (req, res) => {
         );
         const clientInfo = clientRows[0] || { first_name: 'Guest', last_name: '' };
 
+        // ==========================================
+        // 🔥 G. UPDATE TABLE / ROOM STATUS (Restored)
+        // ==========================================
+        
+        // 1. If it's a Table Order, set table to Occupied
+        if (orderData.table_id) {
+            await connection.query(
+                "UPDATE fb_tables SET status = 'Occupied' WHERE table_id = ?", 
+                [orderData.table_id]
+            );
+            console.log(`🪑 Table ${orderData.table_id} updated to Occupied`);
+        } 
+        
+        // 2. If it's a Room Order, set room to Occupied (If applicable)
+        // (I assumed the table name is tbl_rooms and column is status based on your previous code)
+        else if (orderData.room_id) {
+            await connection.query(
+                "UPDATE tbl_rooms SET status = 'Occupied' WHERE room_id = ?", 
+                [orderData.room_id]
+            );
+            console.log(`🏨 Room ${orderData.room_id} updated to Occupied`);
+        }
+
+        // ==========================================
+
         await connection.commit();
 
         // 4. Real-time Notification
