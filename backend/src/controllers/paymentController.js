@@ -5,84 +5,104 @@ const SERVICE_RATE = 0.10; // 10%
 const VAT_RATE = 0.12;     // 12%
 
 // ==========================================
-// HELPER FUNCTIONS
+// 🛠️ HELPER FUNCTIONS (Fixed)
 // ==========================================
 
-// Helper: Verify PayMongo Webhook Signature
-const verifyPayMongoSignature = (req) => {
+/**
+ * Validates the PayMongo Webhook Signature
+ * Checks for req.rawBody (from server.js) or req.body (Buffer)
+ */
+const validateWebhookSignature = (req) => {
+    // 1. Retrieve the Raw Body (Buffer)
+    let rawBody;
+    
+    // Check Strategy A (Global verify middleware)
+    if (req.rawBody) {
+        rawBody = req.rawBody; 
+    } 
+    // Check Strategy B (Route-specific express.raw middleware)
+    else if (Buffer.isBuffer(req.body)) {
+        rawBody = req.body;    
+    } 
+    else {
+        throw new Error("Server misconfiguration: Raw body missing. Check server.js");
+    }
+
     const signatureHeader = req.headers['paymongo-signature'];
-    const bodyString = req.body.toString();
-    const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
+    if (!signatureHeader) throw new Error("Missing signature header");
 
-    if (!signatureHeader || !webhookSecret) return false;
-
+    // 2. Extract Timestamp and Signature
     const parts = signatureHeader.split(',');
-    let timestamp, liveSignature;
+    let timestamp, liveSignature, testSignature;
 
     parts.forEach(part => {
         const [key, value] = part.split('=');
         if (key === 't') timestamp = value;
-        if (key === 'li' || key === 'te') liveSignature = value;
+        if (key === 'li') liveSignature = value;
+        if (key === 'te') testSignature = value;
     });
 
-    if (!timestamp || !liveSignature) return false;
+    const signatureToMatch = liveSignature || testSignature;
+    if (!timestamp || !signatureToMatch) throw new Error("Invalid signature format");
 
-    const signedPayload = `${timestamp}.${bodyString}`;
+    // 3. Verify Hash
+    const signedPayload = `${timestamp}.${rawBody.toString()}`;
     const computedSignature = crypto
-        .createHmac('sha256', webhookSecret)
+        .createHmac('sha256', process.env.PAYMONGO_WEBHOOK_SECRET)
         .update(signedPayload)
         .digest('hex');
 
-    return computedSignature === liveSignature;
+    if (computedSignature !== signatureToMatch) {
+        throw new Error("Signature mismatch");
+    }
+
+    // 4. Return Parsed Event
+    return JSON.parse(rawBody.toString());
 };
 
-// Helper: Determine Location String & Order Type
-const resolveOrderLocation = async (connection, table_id, room_id) => {
-    let finalLocation = "";
-    let orderType = "Takeout";
+/**
+ * Extracts and cleans order data from PayMongo Metadata
+ * (This was missing in your file)
+ */
+const parseOrderMetadata = (metadata) => {
+    const table_id = metadata.table_id ? parseInt(metadata.table_id) : null;
+    const room_id = metadata.room_id ? parseInt(metadata.room_id) : null;
 
-    if (table_id) {
-        orderType = "Dine-in";
-        const [tRows] = await connection.query(
-            "SELECT table_number FROM fb_tables WHERE table_id = ?", 
-            [table_id]
-        );
+    // Determine Location String
+    let locationString = "Takeout";
+    if (table_id) locationString = `Table ${table_id}`;
+    if (room_id) locationString = `Room ${room_id}`;
 
-        finalLocation = tRows.length > 0 
-            ? `Table ${tRows[0].table_number}` 
-            : `Table (ID: ${table_id})`;
-
-        await connection.query(
-            "UPDATE fb_tables SET status = 'Occupied' WHERE table_id = ?", 
-            [table_id]
-        );
-    }
-    else if (room_id) {
-        orderType = "Room Dining";
-        const [rRows] = await connection.query(
-            "SELECT room_num FROM tbl_rooms WHERE room_id = ?", 
-            [room_id]
-        );
-
-        finalLocation = rRows.length > 0 
-            ? `Room ${rRows[0].room_num}` 
-            : `Room (ID: ${room_id})`;
-    } 
-    else {
-        // 🔥 FIX THIS: Add Takeout Location
-        finalLocation = "Takeout Counter";
+    // Safe JSON Parse for items
+    let order_items = [];
+    try {
+        if (typeof metadata.order_items === 'string') {
+            order_items = JSON.parse(metadata.order_items);
+        }
+    } catch (e) { 
+        console.error("Error parsing order_items:", e); 
     }
 
-    return { finalLocation, orderType };
+    return {
+        client_id: metadata.client_id,
+        table_id,
+        room_id,
+        locationString,
+        special_instructions: metadata.special_instructions || null,
+        items_total: parseFloat(metadata.items_total || 0),
+        service_charge_amount: parseFloat(metadata.service_charge_amount || 0),
+        vat_amount: parseFloat(metadata.vat_amount || 0),
+        total_amount: parseFloat(metadata.total_amount || 0),
+        order_items
+    };
 };
 
 // ==========================================
 // CONTROLLERS
 // ==========================================
 
-// @desc    Create order and PayMongo payment link (NO DB insertion yet)
+// @desc    Create order and PayMongo payment link
 // @route   POST /api/orders/checkout
-// @access  Customer
 export const createPayMongoPayment = async (req, res) => {
     try {
         const { cart_items, table_id, room_id, special_instructions } = req.body;
@@ -98,7 +118,6 @@ export const createPayMongoPayment = async (req, res) => {
         const orderItemsData = [];
 
         for (const item of cart_items) {
-            // Fetch fresh price from DB to prevent tampering
             const [menuItem] = await pool.query("SELECT item_name, price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
 
             if (menuItem.length === 0) {
@@ -145,7 +164,7 @@ export const createPayMongoPayment = async (req, res) => {
             }
         ];
 
-        // 5. Prepare Metadata (Strings only)
+        // 5. Prepare Metadata
         const orderMetadata = {
             client_id: client_id.toString(),
             table_id: table_id ? table_id.toString() : '',
@@ -200,200 +219,135 @@ export const createPayMongoPayment = async (req, res) => {
 
 // @desc    PayMongo Webhook Handler - CREATES order after payment
 // @route   POST /api/payments/webhook
-// @access  Public (verified by signature)
-// @desc    PayMongo Webhook Handler - CREATES order after payment
-// @route   POST /api/payments/webhook
-// @access  Public (verified by signature)
 export const paymongoWebhook = async (req, res) => {
     const connection = await pool.getConnection();
+
     try {
-        console.log('Webhook received...');
-
-        // ---------------------------------------------------------
-        // 🔥 CRITICAL FIX: Use req.rawBody from server.js
-        // ---------------------------------------------------------
-        if (!req.rawBody) {
-             console.error('❌ req.rawBody is missing! Check server.js middleware.');
-             return res.status(500).json({ message: "Server misconfiguration" });
+        // 1. Security Check & Parsing
+        let event;
+        try {
+            // ✅ Calls the correct helper function we defined above
+            event = validateWebhookSignature(req);
+        } catch (err) {
+            console.error(`❌ Webhook Security Error: ${err.message}`);
+            return res.status(401).json({ message: err.message });
         }
 
-        const bodyString = req.rawBody.toString(); // Use the RAW buffer
-        const signatureHeader = req.headers['paymongo-signature'];
-        
-        if (!signatureHeader) {
-             console.error('Missing PayMongo signature header');
-             return res.status(401).json({ message: "Missing signature" });
-        }
+        // 2. Handle Event Type
+        const eventType = event.data.attributes.type;
 
-        // 3. Extract Timestamp (t) and Signature (te or li)
-        const parts = signatureHeader.split(',');
-        let timestamp, testSignature, liveSignature;
-
-        parts.forEach(part => {
-            const [key, value] = part.split('=');
-            if (key === 't') timestamp = value;
-            if (key === 'te') testSignature = value; 
-            if (key === 'li') liveSignature = value; 
-        });
-
-        const signatureToMatch = liveSignature || testSignature;
-
-        if (!timestamp || !signatureToMatch) {
-            console.error('Invalid signature header format');
-            return res.status(401).json({ message: "Invalid signature format" });
-        }
-
-        // 4. Construct the "Signed Payload"
-        const signedPayload = `${timestamp}.${bodyString}`;
-        const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
-
-        const computedSignature = crypto
-            .createHmac('sha256', webhookSecret)
-            .update(signedPayload)
-            .digest('hex');
-
-        // 5. Secure Comparison
-        if (computedSignature !== signatureToMatch) {
-            console.error('❌ Signature mismatch!');
-            console.error(`Computed: ${computedSignature} vs Header: ${signatureToMatch}`);
-            return res.status(401).json({ message: "Invalid webhook signature" });
-        }
-
-        console.log('✅ Signature verified successfully!');
-
-        // 6. Parse the body (Now we can safely use req.body or parse rawBody)
-        const event = JSON.parse(bodyString);
-
-        if (event.data.attributes.type === 'payment.paid') {
-            await connection.beginTransaction();
-
-            const paymentData = event.data.attributes.data;
-            const paymongo_payment_id = paymentData.id;
-            const metadata = paymentData.attributes.metadata;
-
-            // Idempotency Check
-            const [existingPayment] = await connection.query(
-                "SELECT * FROM fb_payments WHERE paymongo_payment_id = ?",
-                [paymongo_payment_id]
-            );
-
-            if (existingPayment.length > 0) {
-                await connection.commit();
-                return res.status(200).json({ message: "Order already processed" });
-            }
-
-            // Extract Data
-            const client_id = metadata.client_id;
-            const table_id = metadata.table_id ? parseInt(metadata.table_id) : null;
-            const room_id = metadata.room_id ? parseInt(metadata.room_id) : null;
-            
-            // Clean up Location String for DB
-            let locationString = "Takeout";
-            if(table_id) locationString = `Table ${table_id}`;
-            if(room_id) locationString = `Room ${room_id}`;
-
-            const special_instructions = metadata.special_instructions || null;
-            const items_total = parseFloat(metadata.items_total || 0);
-            const service_charge_amount = parseFloat(metadata.service_charge_amount || 0);
-            const vat_amount = parseFloat(metadata.vat_amount || 0);
-            const total_amount = parseFloat(metadata.total_amount || 0);
-            
-            let order_items = [];
-            try {
-                if (typeof metadata.order_items === 'string') {
-                    order_items = JSON.parse(metadata.order_items);
-                }
-            } catch (e) { console.error("Error parsing order_items:", e); }
-
-            // Insert Order
-            const orderSql = `
-                INSERT INTO fb_orders 
-                (client_id, table_id, room_id, delivery_location, items_total, service_charge_amount, 
-                 vat_amount, total_amount, special_instructions, status, order_date) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
-            `;
-            
-            const [orderResult] = await connection.query(orderSql, [
-                client_id, table_id, room_id, locationString, items_total,
-                service_charge_amount, vat_amount, total_amount, special_instructions
-            ]);
-
-            const new_order_id = orderResult.insertId;
-
-            // Insert Items
-            if (order_items.length > 0) {
-                const orderDetailsSql = `
-                    INSERT INTO fb_order_details 
-                    (order_id, item_id, quantity, price_on_purchase, subtotal, instructions) 
-                    VALUES ?`;
-                
-                // Bulk Insert format for MySQL
-                const detailValues = order_items.map(item => [
-                    new_order_id,
-                    item.item_id,
-                    item.quantity,
-                    item.price_on_purchase,
-                    (item.quantity * item.price_on_purchase),
-                    item.instructions || ''
-                ]);
-                
-                await connection.query(orderDetailsSql, [detailValues]);
-            }
-
-            // Insert Payment Record
-            await connection.query(`
-                INSERT INTO fb_payments 
-                (order_id, payment_method, amount, payment_status, paymongo_payment_id, payment_date) 
-                VALUES (?, ?, ?, 'paid', ?, NOW())`, 
-                [new_order_id, paymentData.attributes.source?.type || 'paymongo', total_amount, paymongo_payment_id]
-            );
-            
-            // Get Client Info for Notification
-            const [clientRows] = await connection.query("SELECT first_name, last_name FROM tbl_client_users WHERE client_id = ?", [client_id]);
-            const clientInfo = clientRows[0] || { first_name: 'Guest', last_name: '' };
-
-            await connection.commit();
-
-            // ---------------------------------------------------------
-            // 🔔 REAL-TIME NOTIFICATION (Socket.IO)
-            // ---------------------------------------------------------
-            const io = req.app.get('io');
-            if (io) {
-                io.emit('new-order', {
-                    order_id: new_order_id,
-                    delivery_location: locationString,
-                    status: 'pending',
-                    total_amount,
-                    first_name: clientInfo.first_name,
-                    last_name: clientInfo.last_name,
-                    items: order_items,
-                    order_date: new Date(),
-                    timestamp: new Date()
-                });
-                console.log(`📡 Socket event 'new-order' emitted for Order #${new_order_id}`);
-            }
-
-            return res.status(200).json({ message: "Order created", order_id: new_order_id });
-
-        } else if (event.data.attributes.type === 'payment.failed') {
-            console.log('Payment failed event.');
+        if (eventType === 'payment.failed') {
+            console.log('⚠️ Payment failed event received.');
             return res.status(200).json({ message: "Payment failed acknowledged" });
         }
 
-        res.status(200).json({ message: "Event received" });
+        if (eventType !== 'payment.paid') {
+            return res.status(200).json({ message: "Event ignored" });
+        }
+
+        // 3. Process Successful Payment
+        await connection.beginTransaction();
+
+        const paymentData = event.data.attributes.data;
+        const paymongo_payment_id = paymentData.id;
+        
+        // A. Idempotency Check
+        const [existing] = await connection.query(
+            "SELECT 1 FROM fb_payments WHERE paymongo_payment_id = ?", 
+            [paymongo_payment_id]
+        );
+
+        if (existing.length > 0) {
+            await connection.commit();
+            return res.status(200).json({ message: "Order already processed" });
+        }
+
+        // B. Prepare Data using the Helper
+        // ✅ Calls the helper function we added to this file
+        const orderData = parseOrderMetadata(paymentData.attributes.metadata);
+
+        // C. Insert Order
+        const orderSql = `
+            INSERT INTO fb_orders 
+            (client_id, table_id, room_id, delivery_location, items_total, service_charge_amount, 
+             vat_amount, total_amount, special_instructions, status, order_date) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())
+        `;
+        
+        const [orderResult] = await connection.query(orderSql, [
+            orderData.client_id, orderData.table_id, orderData.room_id, orderData.locationString,
+            orderData.items_total, orderData.service_charge_amount, orderData.vat_amount, 
+            orderData.total_amount, orderData.special_instructions
+        ]);
+
+        const new_order_id = orderResult.insertId;
+
+        // D. Insert Order Details (Bulk)
+        if (orderData.order_items.length > 0) {
+            const detailsSql = `
+                INSERT INTO fb_order_details 
+                (order_id, item_id, quantity, price_on_purchase, subtotal, instructions) 
+                VALUES ?`;
+            
+            const detailValues = orderData.order_items.map(item => [
+                new_order_id,
+                item.item_id,
+                item.quantity,
+                item.price_on_purchase,
+                (item.quantity * item.price_on_purchase),
+                item.instructions || ''
+            ]);
+            
+            await connection.query(detailsSql, [detailValues]);
+        }
+
+        // E. Insert Payment Record
+        await connection.query(`
+            INSERT INTO fb_payments 
+            (order_id, payment_method, amount, payment_status, paymongo_payment_id, payment_date) 
+            VALUES (?, ?, ?, 'paid', ?, NOW())`, 
+            [new_order_id, paymentData.attributes.source?.type || 'paymongo', orderData.total_amount, paymongo_payment_id]
+        );
+
+        // F. Get Client Info
+        const [clientRows] = await connection.query(
+            "SELECT first_name, last_name FROM tbl_client_users WHERE client_id = ?", 
+            [orderData.client_id]
+        );
+        const clientInfo = clientRows[0] || { first_name: 'Guest', last_name: '' };
+
+        await connection.commit();
+
+        // 4. Real-time Notification
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('new-order', {
+                order_id: new_order_id,
+                delivery_location: orderData.locationString,
+                status: 'pending',
+                total_amount: orderData.total_amount,
+                first_name: clientInfo.first_name,
+                last_name: clientInfo.last_name,
+                items: orderData.order_items,
+                order_date: new Date(),
+                timestamp: new Date()
+            });
+            console.log(`✅ Order #${new_order_id} processed & notified.`);
+        }
+
+        res.status(200).json({ message: "Order created", order_id: new_order_id });
 
     } catch (error) {
         if (connection) await connection.rollback();
-        console.error("Webhook Error:", error);
+        console.error("❌ Webhook Processing Error:", error);
         res.status(500).json({ error: error.message });
     } finally {
         if (connection) connection.release();
     }
-};  
+};
 
 // @desc    Record a new payment (for cash/manual payments)
 // @route   POST /api/payments
-// @access  Cashier/Admin
 export const recordPayment = async (req, res) => {
     const connection = await pool.getConnection();
     try {
@@ -405,11 +359,9 @@ export const recordPayment = async (req, res) => {
 
         await connection.beginTransaction();
 
-        // Insert Payment
         const paymentSql = "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
         const [paymentResult] = await connection.query(paymentSql, [order_id, payment_method, amount, change_amount || 0]);
 
-        // Update Order Status
         await connection.query("UPDATE fb_orders SET status = 'paid' WHERE order_id = ?", [order_id]);
 
         await connection.commit();
@@ -425,7 +377,6 @@ export const recordPayment = async (req, res) => {
 
 // @desc    Get payments for an order
 // @route   GET /api/payments/:order_id
-// @access  Staff/Admin
 export const getPaymentsForOrder = async (req, res) => {
     try {
         const [payments] = await pool.query("SELECT * FROM fb_payments WHERE order_id = ?", [req.params.order_id]);
