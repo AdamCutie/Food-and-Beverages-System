@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, Loader2 } from "lucide-react"; // Added Loader icon
-import ReceiptModal from "../components/ReceiptModal"; // Adjust path if needed
+import ReceiptModal from "../../pages/Customer/components/ReceiptModal"; // Adjust path if needed
 import toast from "react-hot-toast";
 import apiClient from '../../utils/apiClient'; 
 
