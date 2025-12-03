@@ -6,7 +6,10 @@ import InternalNavBar from './components/InternalNavBar';
 import IngredientModal from './components/IngredientModal'; 
 import AdjustStockModal from './components/AdjustStockModal'; 
 import apiClient from '../../utils/apiClient'; 
-import './KitchenTheme.css'; // Import CSS
+import './KitchenTheme.css'; 
+
+// 👇 1. Import Socket Hook
+import { useSocket } from '../../context/SocketContext';
 
 const InventoryPage = () => {
   const [ingredients, setIngredients] = useState([]);
@@ -14,13 +17,16 @@ const InventoryPage = () => {
   const [error, setError] = useState(null);
   const { token } = useAuth();
 
+  // 👇 2. Get Socket Instance
+  const { socket } = useSocket();
+
   const [isIngredientModalOpen, setIsIngredientModalOpen] = useState(false);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
 
-  const fetchIngredients = async () => {
+  const fetchIngredients = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       const response = await apiClient('/inventory'); 
       if (!response.ok) throw new Error('Failed to fetch ingredients.');
       const data = await response.json();
@@ -29,16 +35,38 @@ const InventoryPage = () => {
     } catch (err) {
        if (err.message !== 'Session expired') {
         setError(err.message);
-        toast.error(err.message);
+        // Don't toast on background refresh to avoid spam
+        if (!isBackground) toast.error(err.message);
       }
     } finally {
-      setLoading(false); 
+      if (!isBackground) setLoading(false); 
     }
   };
 
   useEffect(() => {
     if (token) fetchIngredients();
-  }, [token]);
+
+    // 👇 3. Add Socket Listeners
+    if (socket) {
+        // When an order is placed or status changes, stock might change
+        socket.on('new-order', () => {
+            console.log("📦 Order placed, refreshing inventory...");
+            fetchIngredients(true); // true = background refresh (no loading spinner)
+        });
+
+        socket.on('order-status-updated', () => {
+            // E.g. Order cancelled -> Stock restored
+            fetchIngredients(true);
+        });
+    }
+
+    return () => {
+        if (socket) {
+            socket.off('new-order');
+            socket.off('order-status-updated');
+        }
+    };
+  }, [token, socket]);
 
   const handleOpenAddModal = () => {
     setSelectedIngredient(null);
@@ -67,7 +95,7 @@ const InventoryPage = () => {
       if (!response.ok) throw new Error('Failed to save ingredient');
       toast.success(`Ingredient ${isEditMode ? 'updated' : 'created'}!`);
       handleCloseModals();
-      fetchIngredients(); 
+      fetchIngredients(true); 
     } catch (err) {
        toast.error(err.message);
     }
@@ -82,7 +110,7 @@ const InventoryPage = () => {
         if (!response.ok) throw new Error('Failed to adjust stock');
         toast.success('Stock adjusted!');
         handleCloseModals();
-        fetchIngredients(); 
+        fetchIngredients(true); 
     } catch (err) {
        toast.error(err.message);
     }

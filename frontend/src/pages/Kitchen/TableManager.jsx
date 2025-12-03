@@ -4,21 +4,27 @@ import toast from 'react-hot-toast';
 import apiClient from '../../utils/apiClient';
 import InternalNavBar from './components/InternalNavBar';
 import './KitchenTheme.css'; 
+// 👇 1. Import Socket Hook
+import { useSocket } from '../../context/SocketContext';
 
 const pageTitleStyle = {
-  fontSize: '1.875rem', // 30px
+  fontSize: '1.875rem', 
   fontWeight: 'bold',
   marginBottom: '24px',
   textAlign: 'center',
-  color: '#F9A825', // Make the title white
+  color: '#F9A825', 
 };
 
 const TableManager = () => {
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchTables = async () => {
+  // 👇 2. Get Socket Instance
+  const { socket } = useSocket();
+
+  const fetchTables = async (isBackground = false) => {
     try {
+      if (!isBackground) setLoading(true);
       const response = await apiClient('/tables');
       if (response.ok) {
         setTables(await response.json());
@@ -26,19 +32,43 @@ const TableManager = () => {
     } catch (error) {
       toast.error("Failed to load tables");
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTables();
-    // Optional: Auto-refresh every 30 seconds to see updates from other staff
-    const interval = setInterval(fetchTables, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    // 👇 3. Replaced Polling with Sockets
+if (socket) {
+        // 1. Listen for specific table updates (Fastest)
+        socket.on('table-update', (data) => {
+            console.log("🪑 Table update received:", data);
+            
+            // Optimistic Update: Update the specific table immediately without fetching
+            setTables(prevTables => prevTables.map(table => {
+                if (table.table_id === parseInt(data.table_id)) {
+                    return { ...table, status: data.status };
+                }
+                return table;
+            }));
+        });
+
+        // 2. Backup: Listen for new orders (Just in case)
+        socket.on('new-order', () => {
+             fetchTables(true);
+        });
+    }
+
+    return () => {
+        if(socket) {
+            socket.off('table-update');
+            socket.off('new-order');
+        }
+    };
+  }, [socket]);
 
   const handleToggleStatus = async (table) => {
-    // Logic: If Available -> Set to Occupied. If Occupied -> Set to Available.
     const newStatus = table.status === 'Available' ? 'Occupied' : 'Available';
     
     if (!window.confirm(`Set Table ${table.table_number} to ${newStatus}?`)) return;
@@ -52,7 +82,15 @@ const TableManager = () => {
         if (!res.ok) throw new Error("Failed to update");
         
         toast.success(`Table ${table.table_number} is now ${newStatus}`);
-        fetchTables(); // Refresh UI
+        
+        // We update locally immediately for speed
+        setTables(prev => prev.map(t => 
+            t.table_id === table.table_id ? { ...t, status: newStatus } : t
+        ));
+
+        // Note: Ideally, your Backend Table Controller should ALSO emit 
+        // an event like io.emit('table-update') so other screens update too.
+        
     } catch (error) {
         toast.error(error.message);
     }
@@ -65,7 +103,7 @@ const TableManager = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 style={pageTitleStyle}>Manage Table Availability</h1>
 
-        {loading ? <p>Loading...</p> : (
+        {loading ? <p className="text-white text-center mt-10">Loading...</p> : (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 {tables.map((table) => (
                     <div 

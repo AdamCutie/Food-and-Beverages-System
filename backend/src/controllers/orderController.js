@@ -4,6 +4,18 @@ import { validateStock, adjustStock, logOrderStockChange } from "./itemControlle
 const SERVICE_RATE = 0.10; // 10%
 const VAT_RATE = 0.12;     // 12%
 
+// Helper function to emit socket events
+const emitOrderUpdate = (req, eventName, data) => {
+    try {
+        const io = req.app.get('io');
+        if (io) {
+            io.emit(eventName, data);
+            console.log(`📡 Socket event emitted: ${eventName}`, data);
+        }
+    } catch (error) {
+        console.error('Failed to emit socket event:', error.message);
+    }
+};
 
 // @desc    Create a new POS order (cash/staff)
 // @route   POST /api/orders/pos
@@ -140,6 +152,16 @@ export const createPosOrder = async (req, res) => {
 
         await connection.commit();
 
+         // ✅ NEW: Emit real-time notification
+        emitOrderUpdate(req, 'new-order', {
+            order_id,
+            order_type,
+            table_id,
+            total_amount: calculatedTotalAmount,
+            status: 'pending',
+            timestamp: new Date()
+        });
+
         res.status(201).json({
             order_id,
             total_amount: calculatedTotalAmount,
@@ -173,8 +195,7 @@ export const createOrder = async (req, res) => {
             throw new Error("Missing required order information.");
         }
 
-        // --- LOGIC: Handle Table ID vs Text Location ---
-        let finalLocation = delivery_location;
+        let finalLocation = "";
         let finalTableId = null;
         let finalRoomId = null;
 
@@ -183,23 +204,28 @@ export const createOrder = async (req, res) => {
             const [tables] = await connection.query("SELECT table_number FROM fb_tables WHERE table_id = ?", [table_id]);
             if (tables.length > 0) {
                 finalLocation = `Table ${tables[0].table_number}`;
+            } else {
+                finalLocation = `Table (ID: ${table_id})`;
             }
         }
-
-        if (order_type === 'Room Dining' && req.body.room_id) {
-             finalRoomId = req.body.room_id;
+        else if (order_type === 'Room Dining' && room_id) {
+             finalRoomId = room_id;
              const [rooms] = await connection.query("SELECT room_num FROM tbl_rooms WHERE room_id = ?", [finalRoomId]);
              if (rooms.length > 0) {
                  finalLocation = `Room ${rooms[0].room_num}`;
              }
+             else {
+                finalLocation = "Room (Unknown)";
+             }
         }
-        // ------------------------------------------------
+        else if (delivery_location) {
+            finalLocation = delivery_location;
+        }
 
         const orderSql = "INSERT INTO fb_orders (client_id, order_type, delivery_location, table_id, room_id, status) VALUES (?, ?, ?, ?, ?, 'pending')";
         const [orderResult] = await connection.query(orderSql, [client_id, order_type, finalLocation, finalTableId, finalRoomId]);
         const order_id = orderResult.insertId;
 
-        // --- NEW LOGIC: Set Table to Occupied ---
         if (finalTableId) {
             await connection.query(
                 "UPDATE fb_tables SET status = 'Occupied' WHERE table_id = ?", 
@@ -210,7 +236,6 @@ export const createOrder = async (req, res) => {
         let calculatedItemsTotal = 0;
 
         for (const item of items) {
-            // 1. Fetch price & promo details
             const [rows] = await connection.query(
                 `SELECT 
                     mi.price, 
@@ -226,7 +251,6 @@ export const createOrder = async (req, res) => {
             const dbItem = rows[0];
             let actualPrice = parseFloat(dbItem.price); 
 
-            // 2. Apply promo logic
             if (dbItem.discount_percentage && dbItem.is_active) {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -243,10 +267,8 @@ export const createOrder = async (req, res) => {
             const subtotal = actualPrice * item.quantity;
             calculatedItemsTotal += subtotal;
             
-            // Item instructions fallback
             const itemInstructions = item.instructions || instructions || '';
             
-            // UPDATED: Insert 'actualPrice' into 'price_on_purchase'
             const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, price_on_purchase, subtotal, instructions) VALUES (?, ?, ?, ?, ?, ?)";
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, actualPrice, subtotal, itemInstructions]);
         }
@@ -272,10 +294,41 @@ export const createOrder = async (req, res) => {
             order_id
         ]);
 
-        // Create notification
-        await createOrUpdateNotification(order_id, client_id, 'pending', connection);
+        // 🔥 FIX: Fetch customer name for the socket event
+        const [clientInfo] = await connection.query(
+            "SELECT first_name, last_name FROM tbl_client_users WHERE client_id = ?",
+            [client_id]
+        );
+
+        await createOrUpdateNotification(order_id, client_id, 'pending', connection, req);
 
         await connection.commit();
+
+        // ✅ FIX: Send complete order data including customer name
+        emitOrderUpdate(req, 'new-order', {
+            order_id,
+            order_type,
+            delivery_location: finalLocation,
+            table_id: finalTableId,
+            room_id: finalRoomId,
+            total_amount: calculatedTotalAmount,
+            status: 'pending',
+            first_name: clientInfo[0]?.first_name || '',
+            last_name: clientInfo[0]?.last_name || '',
+            order_date: new Date().toISOString(), // ✅ Add timestamp
+            timestamp: new Date()
+        });
+
+        if (finalTableId) {
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('table-update', {
+                    table_id: parseInt(finalTableId),
+                    status: 'Occupied'
+                });
+                console.log(`📡 Emitted table-update: Table ${finalTableId} is now Occupied`);
+            }
+        }
 
         res.status(201).json({
             order_id,
@@ -464,9 +517,18 @@ export const updateOrderStatus = async (req, res) => {
         }
 
         // Create/Update the notification
-        await createOrUpdateNotification(id, client_id, newStatus, connection);
+        await createOrUpdateNotification(id, client_id, newStatus, connection, req);
 
         await connection.commit();
+
+        // ✅ NEW: Emit status update to all clients
+        emitOrderUpdate(req, 'order-status-updated', {
+            order_id: parseInt(id),
+            status: newStatus,
+            client_id,
+            timestamp: new Date()
+        });
+
         res.json({ message: `Order status updated to ${newStatus}` });
 
     } catch (error) {
@@ -523,24 +585,12 @@ export const getServedOrders = async (req, res) => {
     }
 };
 
-// Helper function to create/update notifications
-const createOrUpdateNotification = async (order_id, client_id, status, connection) => {
+const createOrUpdateNotification = async (order_id, client_id, status, connection, req) => {
     if (!client_id) {
         return;
     }
 
     try {
-        // --- 1. NEW LOGIC: Only allow deletion for 'served' orders OR 
-        //    if the notification is for the order currently being updated (to prevent duplicates) ---
-        
-        // This query deletes any notification associated with this specific order_id 
-        // IF the order's status is 'served'. This ensures 'served' notifications are 
-        // eligible for deletion (e.g., via the Clear All button in NotificationPanel.jsx, 
-        // which will call an endpoint that ultimately runs this logic for served orders).
-        // It also deletes the existing notification for the current order_id 
-        // *before* inserting the new one, regardless of status, which is necessary 
-        // to prevent duplicate notifications for the same order_id/status update.
-
         const deleteSql = `
             DELETE n
             FROM fb_notifications n
@@ -548,14 +598,8 @@ const createOrUpdateNotification = async (order_id, client_id, status, connectio
             WHERE n.order_id = ? 
               AND (o.status = 'served' OR n.order_id = ?) 
         `;
-        // The second 'n.order_id = ?' ensures the *current* notification for this order_id 
-        // is always deleted before a new one is created, preventing duplicate notifications 
-        // for the same order when its status changes.
         await (connection || pool).query(deleteSql, [order_id, order_id]);
-        
-        // --- END NEW LOGIC ---
 
-        // Define message based on status
         let title = `Order #${order_id} Updated!`;
         let message = `Your order #${order_id} is now ${status}.`;
 
@@ -582,12 +626,24 @@ const createOrUpdateNotification = async (order_id, client_id, status, connectio
                 break;
         }
 
-        // Insert new notification
         const insertSql = `
             INSERT INTO fb_notifications (client_id, order_id, title, message, is_read)
             VALUES (?, ?, ?, ?, 0)
         `;
         await (connection || pool).query(insertSql, [client_id, order_id, title, message]);
+
+        // ✅ NEW: Emit notification via socket (if req is passed)
+        if (req) {
+            emitOrderUpdate(req, 'new-notification', {
+                client_id,
+                order_id,
+                title,
+                message,
+                status,
+                is_read: false,
+                timestamp: new Date()
+            });
+        }
 
     } catch (error) {
         console.error(`Failed to create notification for order ${order_id}:`, error.message);

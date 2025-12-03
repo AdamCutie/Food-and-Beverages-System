@@ -24,7 +24,26 @@ export const updateTableStatus = async (req, res) => {
     }
 
     try {
-        await pool.query("UPDATE fb_tables SET status = ? WHERE table_id = ?", [status, id]);
+        // 1. Update Database
+        const [result] = await pool.query("UPDATE fb_tables SET status = ? WHERE table_id = ?", [status, id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Table not found" });
+        }
+
+        // ---------------------------------------------------------
+        // ⭐ NEW CODE: Broadcast the change to everyone!
+        // ---------------------------------------------------------
+        const io = req.app.get('io'); // Get the socket instance
+        if (io) {
+            io.emit('table-update', { 
+                table_id: parseInt(id), 
+                status: status 
+            });
+            console.log(`📡 Emitted table-update: Table ${id} is now ${status}`);
+        }
+        // ---------------------------------------------------------
+
         res.json({ message: `Table ${id} is now ${status}` });
     } catch (error) {
         res.status(500).json({ message: "Error updating table status", error: error.message });

@@ -1,4 +1,6 @@
 import express from "express";
+import { createServer } from "http";  // ✅ ADD THIS
+import { Server } from "socket.io";   // ✅ ADD THIS
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
@@ -37,9 +39,37 @@ const envPath = path.resolve(__dirname, '../.env');
 dotenv.config({ path: envPath });
 
 const app = express();
+const httpServer = createServer(app);  // ✅ Now works
 
-// --- 1. FIX: Trust Proxy for Render ---
-// This prevents the "X-Forwarded-For" crash
+// Socket.IO setup
+const io = new Server(httpServer, {    // ✅ Now works
+  cors: {
+    origin: [
+      'http://localhost:5173',
+      'http://localhost:21917',
+      'https://food-and-beverages-system.onrender.com'
+    ],
+    credentials: true
+  }
+});
+
+// Make io accessible to routes
+app.set('io', io);
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('✅ Client connected:', socket.id);
+
+  socket.on('join-role', (role) => {
+    socket.join(role);
+    console.log(`👤 User joined room: ${role}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('❌ Client disconnected:', socket.id);
+  });
+});
+
 app.set('trust proxy', 1); 
 
 // CORS Configuration - works for both development and production
@@ -53,7 +83,6 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (mobile apps, Postman, same-origin)
     if (!origin) return callback(null, true);
-    
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'CORS policy does not allow access from this origin.';
       return callback(new Error(msg), false);
@@ -78,12 +107,12 @@ app.use(express.json());
 // Test DB Connection
 app.get("/api/health", async (req, res) => {
     // ... existing health check code ...
-    try {
-        await pool.query('SELECT 1');
-        res.send({ status: "OK", database: "Connected", time: new Date() });
-    } catch (e) {
-        res.status(500).send({ status: "Error", database: "Not Connected", error: e.message });
-    }
+  try {
+    await pool.query('SELECT 1');
+    res.send({ status: "OK", database: "Connected", time: new Date() });
+  } catch (e) {
+    res.status(500).send({ status: "Error", database: "Not Connected", error: e.message });
+  }
 });
 
 // Routes exempt from strict Rate Limiter
@@ -101,7 +130,6 @@ app.use("/api/items", itemRoutes);
 
 // NOTE: The webhook is already handled above, this handles the other payment routes
 app.use("/api/payments", paymentRoutes); 
-
 app.use("/api/admin", adminRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use("/api/analytics", analyticsRoutes); 
@@ -115,7 +143,6 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 if(process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname,"../../frontend/dist")))
-
   app.get("*",(req,res)=>{
     res.sendFile(path.join(__dirname,"../../frontend","dist","index.html"))
   })
@@ -124,5 +151,7 @@ if(process.env.NODE_ENV === "production") {
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
+const PORT = process.env.PORT || 21917;
+httpServer.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));  // ✅ CHANGED
+
+export { io };

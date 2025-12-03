@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Trash2, Minus, Plus, MessageSquare } from 'lucide-react';
 import apiClient from '../../../utils/apiClient';
-import '../CustomerTheme.css'; // Import external styles
+import '../CustomerTheme.css';
+import { useSocket } from '../../../context/SocketContext';
 
 const CartPanel = ({
   cartItems = [],
@@ -23,6 +24,8 @@ const CartPanel = ({
   const [selectedTableId, setSelectedTableId] = useState('');
   const [selectedRoomId, setSelectedRoomId] = useState('');
 
+  const { socket } = useSocket();
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -40,6 +43,35 @@ const CartPanel = ({
     fetchData();
   }, []);
 
+  // Listen for Real-Time Table Updates
+  useEffect(() => {
+    if (socket) {
+        socket.on('table-update', (data) => {
+            console.log("🪑 Real-time Table Update:", data);
+            
+            // Update the tables list instantly
+            setTables(prevTables => prevTables.map(table => {
+                if (table.table_id === parseInt(data.table_id)) {
+                    return { ...table, status: data.status };
+                }
+                return table;
+            }));
+
+            // Clear selection if the selected table becomes occupied
+            if (data.status === 'Occupied' && parseInt(selectedTableId) === parseInt(data.table_id)) {
+                 setSelectedTableId(''); 
+                 setDeliveryLocation('');
+            }
+        });
+    }
+
+    return () => {
+        if (socket) {
+            socket.off('table-update');
+        }
+    };
+  }, [socket, selectedTableId, setDeliveryLocation]);
+
   useEffect(() => {
     if (orderType === 'Dine-in') {
         setSelectedRoomId('');
@@ -50,15 +82,21 @@ const CartPanel = ({
     }
   }, [orderType, setDeliveryLocation]);
 
+  // ✅ FIX: Properly handle table selection
   const handleTableChange = (e) => {
     const tId = e.target.value;
     setSelectedTableId(tId);
+    
+    // Set deliveryLocation to table_id for backend
     setDeliveryLocation(tId); 
   };
 
+  // ✅ FIX: Properly handle room selection
   const handleRoomChange = (e) => {
     const rId = e.target.value;
     setSelectedRoomId(rId);
+    
+    // Set deliveryLocation to room_id for backend
     setDeliveryLocation(rId);
   };
 
@@ -121,7 +159,12 @@ const CartPanel = ({
                     >
                         <option value="">-- Choose a Table --</option>
                         {tables.map(table => (
-                            <option key={table.table_id} value={table.table_id} disabled={table.status !== 'Available'}>
+                            <option 
+                                key={table.table_id} 
+                                value={table.table_id} 
+                                disabled={table.status !== 'Available'}
+                                className={table.status !== 'Available' ? 'text-gray-400 bg-gray-100' : ''}
+                            >
                                 Table {table.table_number} ({table.capacity} pax) {table.status !== 'Available' ? '- Occupied' : ''}
                             </option>
                         ))}
@@ -156,16 +199,12 @@ const CartPanel = ({
               cartItems.map((item) => {
                 const itemTotal = parseFloat(item.price) * item.quantity;
 
-                // REMOVED: Image URL calculation logic
-
                 return (
                   <div key={item.item_id} className="cart-item">
-                      {/* Top Section: Details + Total (Image Removed) */}
+                      {/* Top Section: Details + Total */}
                       <div className="cart-item-top">
                           
-                          {/* REMOVED: Image Div */}
-
-                          {/* Details Column - Now full width */}
+                          {/* Details Column */}
                           <div className="cart-item-details w-full"> 
                               {/* Name/Price & Item Total Row */}
                               <div className="cart-item-header">
@@ -257,7 +296,8 @@ const CartPanel = ({
                 disabled={
                     cartItems.length === 0 || 
                     (orderType === 'Dine-in' && !selectedTableId) || 
-                    (orderType === 'Room Dining' && !selectedRoomId)
+                    (orderType === 'Room Dining' && !selectedRoomId) ||
+                    isPlacingOrder
                 }
                 className="place-order-btn"
               >

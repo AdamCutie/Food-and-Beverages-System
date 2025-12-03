@@ -1,34 +1,52 @@
 import React, { useEffect, useState } from "react";
 import { CircleDollarSign, ShoppingCart, Box, Users } from "lucide-react";
 import apiClient from "../../../utils/apiClient";
+import { useSocket } from "../../../context/SocketContext";
 
 const AdminDashboard = () => {
   const [data, setData] = useState({
-    summary: {
-      totalSales: 0,
-      salesGrowth: 0,
-      activeOrders: 0,
-      lowStock: 0,
-      lowStockGrowth: 0,
-      totalStaff: 0,
-    },
+    summary: { totalSales: 0, salesGrowth: 0, activeOrders: 0, lowStock: 0, totalStaff: 0 },
     recentOrders: [],
     stockAlerts: [],
   });
+  
+  const { socket } = useSocket(); // <--- Get Socket
+
+  const fetchData = async () => {
+    try {
+      const res = await apiClient("/dashboard/summary");
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      console.error("Failed to load dashboard data:", err);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await apiClient("/dashboard/summary");
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        console.error("Failed to load dashboard data:", err);
-      }
-    };
-
     fetchData();
-  }, []);
+
+    if (socket) {
+        // When a new order is placed, sales go up and stock goes down.
+        // So we refresh the dashboard data.
+        socket.on('new-order', () => {
+            console.log("💰 New Order! Updating Dashboard...");
+            fetchData(); 
+        });
+
+        // When status changes (e.g. to 'preparing'), stock might be deducted 
+        // depending on your backend logic, so we refresh too.
+        socket.on('order-status-updated', () => {
+            fetchData();
+        });
+    }
+
+    return () => {
+        if(socket) {
+            socket.off('new-order');
+            socket.off('order-status-updated');
+        }
+    }
+  }, [socket]);
 
   const { summary, recentOrders, stockAlerts } = data;
 

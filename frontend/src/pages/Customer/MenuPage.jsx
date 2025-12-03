@@ -185,8 +185,10 @@ function MenuPage() {
       navigate('/login');
       return;
     }
-    if (data?.tableID) {
+    if (data?.table_id) {
       setDeliveryLocation(data.table_id);
+    } else if (data?.room_id) {
+      setDeliveryLocation(data.room_id);
     }
     
     // Calculate total for display
