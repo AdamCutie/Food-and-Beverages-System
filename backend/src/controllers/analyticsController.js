@@ -16,6 +16,23 @@ const runQuery = async (sql, params = []) => {
 // @access  Admin
 export const getDashboardAnalytics = async (req, res) => {
   try {
+    // 1. Get the filter from the URL query params
+    const { order_type } = req.query;
+
+    // 2. Prepare dynamic SQL condition and parameters
+    let typeCondition = "";
+    let queryParams = [];
+
+    // If a specific type is requested (and it's not "All"), filter by it
+    if (order_type && order_type !== 'All') {
+      typeCondition = "AND order_type = ?";
+      queryParams = [order_type];
+    } else {
+        // OPTIONAL: If you want to strictly hide 'Phone Order' even when 'All' is selected
+        // uncomment the lines below:
+        // typeCondition = "AND order_type != 'Phone Order'";
+    }
+
     // We will run all queries in parallel for maximum efficiency
     const [
       salesToday,
@@ -35,7 +52,8 @@ export const getDashboardAnalytics = async (req, res) => {
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
         FROM fb_orders 
-        WHERE DATE(order_date) = CURDATE() AND status != 'Cancelled'`
+        WHERE DATE(order_date) = CURDATE() AND status != 'Cancelled' ${typeCondition}`,
+        queryParams
       ),
       // Yesterday
       runQuery(
@@ -44,7 +62,8 @@ export const getDashboardAnalytics = async (req, res) => {
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
         FROM fb_orders 
-        WHERE DATE(order_date) = CURDATE() - INTERVAL 1 DAY AND status != 'Cancelled'`
+        WHERE DATE(order_date) = CURDATE() - INTERVAL 1 DAY AND status != 'Cancelled' ${typeCondition}`,
+        queryParams
       ),
       // This Week (starting Monday)
       runQuery(
@@ -53,7 +72,8 @@ export const getDashboardAnalytics = async (req, res) => {
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
         FROM fb_orders 
-        WHERE YEARWEEK(order_date, 1) = YEARWEEK(NOW(), 1) AND status != 'Cancelled'`
+        WHERE YEARWEEK(order_date, 1) = YEARWEEK(NOW(), 1) AND status != 'Cancelled' ${typeCondition}`,
+        queryParams
       ),
       // This Month
       runQuery(
@@ -62,11 +82,12 @@ export const getDashboardAnalytics = async (req, res) => {
           SUM(total_amount) AS sales, 
           AVG(total_amount) AS avg_sale 
         FROM fb_orders 
-        WHERE YEAR(order_date) = YEAR(NOW()) AND MONTH(order_date) = MONTH(NOW()) AND status != 'Cancelled'`
+        WHERE YEAR(order_date) = YEAR(NOW()) AND MONTH(order_date) = MONTH(NOW()) AND status != 'Cancelled' ${typeCondition}`,
+        queryParams
       ),
 
       // --- Top Selling Items ---
-      // We join with orders to filter out cancelled items
+      // Join with orders to apply the type filter
       runQuery(
         `SELECT 
           mi.item_name, 
@@ -75,14 +96,17 @@ export const getDashboardAnalytics = async (req, res) => {
         FROM fb_order_details od
         JOIN fb_menu_items mi ON od.item_id = mi.item_id
         JOIN fb_orders o ON od.order_id = o.order_id
-        WHERE o.status != 'Cancelled'
+        WHERE o.status != 'Cancelled' ${typeCondition}
         GROUP BY od.item_id, mi.item_name
         ORDER BY total_sales DESC
-        LIMIT 7`
+        LIMIT 7`,
+        queryParams
       ),
 
       // --- Payment Methods ---
-      // We only count 'paid' transactions
+      // Note: Payments might not always map 1:1 to order_type if not joined, 
+      // but usually payment analysis is global. We'll leave this global for now 
+      // unless you want to filter payments by order type too (requires Join).
       runQuery(
         `SELECT 
           payment_method, 
@@ -94,14 +118,19 @@ export const getDashboardAnalytics = async (req, res) => {
       ),
 
       // --- Order Type Distribution ---
+      // This chart usually shows the split, so filtering it might defeat the purpose,
+      // but we can filter it to see the breakdown *within* the filter if needed.
+      // For now, we'll keep it global to show comparison, or apply filter if you prefer?
+      // Let's apply the filter so the whole dashboard reflects the selection.
       runQuery(
         `SELECT 
           order_type, 
           COUNT(order_id) AS orders, 
           SUM(total_amount) AS total_value 
         FROM fb_orders 
-        WHERE status != 'Cancelled'
-        GROUP BY order_type`
+        WHERE status != 'Cancelled' ${typeCondition}
+        GROUP BY order_type`,
+        queryParams
       ),
 
       // --- Peak Hours ---
@@ -110,10 +139,11 @@ export const getDashboardAnalytics = async (req, res) => {
           HOUR(order_date) AS hour, 
           COUNT(order_id) AS order_count 
         FROM fb_orders 
-        WHERE status != 'Cancelled'
+        WHERE status != 'Cancelled' ${typeCondition}
         GROUP BY hour 
         ORDER BY order_count DESC 
-        LIMIT 1`
+        LIMIT 1`,
+        queryParams
       ),
     ]);
 

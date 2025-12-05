@@ -33,13 +33,20 @@ const AnalyticsDashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // NEW: State for the dropdown filter
+  const [filterType, setFilterType] = useState("All");
+
   const { token } = useAuth();
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       setLoading(true);
       try {
-        const response = await apiClient("/analytics");
+        // NEW: Pass the filterType query param to the backend
+        const queryParam = filterType === "All" ? "" : `?order_type=${filterType}`;
+        const response = await apiClient(`/analytics${queryParam}`);
+        
         if (!response.ok) throw new Error("Failed to fetch analytics data.");
         const result = await response.json();
         setData(result);
@@ -53,18 +60,20 @@ const AnalyticsDashboard = () => {
       }
     };
     if (token) fetchAnalytics();
-  }, [token]);
+  // NEW: Re-fetch whenever the filterType changes
+  }, [token, filterType]); 
 
   if (loading) return <div className="p-8 text-center text-white text-lg">Loading analytics...</div>;
   if (error) return <div className="p-8 text-center text-red-500">Error: {error}</div>;
   if (!data) return <div className="p-8 text-center text-white">No data available.</div>;
 
   // --- Chart Data Preparation ---
+  // Safety checks added (|| 0) in case data is missing for a specific day due to filtering
   const salesTrendData = [
-    { name: "Today", sales: data.salesTrends.today.sales },
-    { name: "Yesterday", sales: data.salesTrends.yesterday.sales },
-    { name: "This Week", sales: data.salesTrends.thisWeek.sales },
-    { name: "This Month", sales: data.salesTrends.thisMonth.sales },
+    { name: "Today", sales: data.salesTrends.today?.sales || 0 },
+    { name: "Yesterday", sales: data.salesTrends.yesterday?.sales || 0 },
+    { name: "This Week", sales: data.salesTrends.thisWeek?.sales || 0 },
+    { name: "This Month", sales: data.salesTrends.thisMonth?.sales || 0 },
   ];
 
   const orderTypeData = data.orderTypeDistribution.map((o) => ({
@@ -72,6 +81,7 @@ const AnalyticsDashboard = () => {
     value: o.orders,
   }));
 
+  // Safety check added (|| [])
   const paymentMethodData = (data.paymentMethods || []).map((method) => ({
     name: method.payment_method,
     value: Number(method.total_value) || 0,
@@ -86,9 +96,29 @@ const AnalyticsDashboard = () => {
   return (
     <div className="admin-section-container grid grid-cols-1 lg:grid-cols-2 gap-6">
       
-      {/* Sales Trend Chart */}
+      {/* Sales Trend Chart WITH DROPDOWN */}
       <div className="admin-card">
-        <h3 className="text-xl font-bold mb-4" style={{color: '#3C2A21'}}>Sales Trends</h3>
+        <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold" style={{color: '#3C2A21'}}>Sales Trends</h3>
+            
+            {/* NEW: Dropdown Filter placed in the header */}
+            <select 
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="p-2 rounded border text-sm font-semibold outline-none cursor-pointer"
+                style={{
+                    borderColor: '#D1C0B6', 
+                    color: '#3C2A21', 
+                    backgroundColor: '#fff2e0'
+                }}
+            >
+                <option value="All">All Orders</option>
+                <option value="Dine-in">Dine-in</option>
+                <option value="Room Service">Room Service</option>
+                <option value="Walk-in">Walk-in</option>
+            </select>
+        </div>
+
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={salesTrendData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#D1C0B6" />
@@ -99,9 +129,11 @@ const AnalyticsDashboard = () => {
                 contentStyle={{ backgroundColor: '#fff2e0', borderColor: '#D1C0B6', color: '#3C2A21' }}
             />
             <Legend />
+            {/* Added name prop so Legend shows "Total Sales" instead of "sales" */}
             <Line
               type="monotone"
               dataKey="sales"
+              name="Total Sales" 
               stroke="#F9A825" // Gold Line
               strokeWidth={3}
               activeDot={{ r: 8, fill: '#3C2A21' }}
@@ -110,7 +142,7 @@ const AnalyticsDashboard = () => {
         </ResponsiveContainer>
       </div>
 
-      {/* Order Type Distribution */}
+      {/* Order Type Distribution (Unchanged Layout) */}
       <div className="admin-card flex flex-col">
         <h3 className="text-xl font-bold mb-4" style={{color: '#3C2A21'}}>Order Type Distribution</h3>
         <div className="flex-1 flex items-center justify-center">
@@ -138,7 +170,7 @@ const AnalyticsDashboard = () => {
         </div>
       </div>
 
-      {/* Top Selling Items */}
+      {/* Top Selling Items (Unchanged Layout) */}
       <div className="admin-card">
         <h3 className="text-xl font-bold mb-4" style={{color: '#3C2A21'}}>Top Selling Items</h3>
         <ResponsiveContainer width="100%" height={300}>
@@ -155,7 +187,7 @@ const AnalyticsDashboard = () => {
         </ResponsiveContainer>
       </div>
 
-      {/* Payment Methods */}
+      {/* Payment Methods (Unchanged Layout) */}
       <div className="admin-card">
         <h3 className="text-xl font-bold mb-4" style={{color: '#3C2A21'}}>Payment Methods</h3>
         {paymentMethodData.length === 0 ? (
