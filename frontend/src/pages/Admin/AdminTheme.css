@@ -157,3 +157,62 @@
   color: #ffffff;
   font-weight: normal;
 }
+
+
+@media print {
+  /* 1. Page Setup: Landscape with narrow margins */
+  @page {
+    size: landscape;
+    margin: 10mm; /* Narrow margins to give content more room */
+  }
+
+  /* 2. Global Reset: Hide Body & Ink Saver Colors */
+  body {
+    visibility: hidden;
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* 3. Dashboard Layout: The "Fit to One Page" Logic */
+  #printable-dashboard {
+    visibility: visible;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    
+    /* Force 2x2 Grid */
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important; /* Two equal columns */
+    gap: 1rem !important; /* Reduce gap to save space */
+    
+    /* SCALING: This shrinks the content to ensure it fits on one page. 
+       Adjust this number (0.6 to 0.9) if it's still too big or too small. */
+    zoom: 0.75; 
+    /* Firefox fallback for zoom */
+    -moz-transform: scale(0.75);
+    -moz-transform-origin: top left;
+  }
+
+  /* 4. Card Styling: Clean White Look */
+  .admin-card, .card, .bg-gray-800, .bg-zinc-900 {
+    background-color: white !important;
+    color: black !important;
+    border: 1px solid #333 !important; /* Thin border to define the box */
+    box-shadow: none !important;
+    break-inside: avoid; /* Stop cards from splitting */
+    page-break-inside: avoid;
+    padding: 1rem !important; /* Reduce padding inside cards */
+    height: auto !important;  /* Let height adjust to content */
+  }
+
+  /* 5. Text & Chart Visibility */
+  h1, h2, h3, p, span, div {
+    color: black !important;
+  }
+  
+  /* 6. Hide Navigation & Extras */
+  nav, header, aside, button, .no-print {
+    display: none !important;
+  }
+}
