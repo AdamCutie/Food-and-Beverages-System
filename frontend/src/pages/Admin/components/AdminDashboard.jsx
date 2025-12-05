@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { CircleDollarSign, ShoppingCart, Box, Armchair } from "lucide-react"; // ✅ Changed Users to Armchair
+import { CircleDollarSign, ShoppingCart, Box, Armchair } from "lucide-react"; 
+import { useNavigate } from "react-router-dom"; // ✅ Import useNavigate
 import apiClient from "../../../utils/apiClient";
 import { useSocket } from "../../../context/SocketContext";
 
-const AdminDashboard = () => {
-  // ✅ Updated initial state: removed totalStaff, added availableTables
+// ✅ Accept onNavigate prop from AdminPage
+const AdminDashboard = ({ onNavigate }) => {
+  const navigate = useNavigate(); // ✅ Hook for URL navigation
+  
   const [data, setData] = useState({
     summary: { totalSales: 0, salesGrowth: 0, activeOrders: 0, lowStock: 0, availableTables: 0, totalTables: 0 },
     recentOrders: [],
@@ -36,7 +39,6 @@ const AdminDashboard = () => {
             fetchData();
         });
 
-        // ✅ ADDED: Listen for table updates (from tableController)
         socket.on('table-update', () => {
              console.log("🪑 Table Updated! Refreshing dashboard...");
              fetchData();
@@ -47,19 +49,26 @@ const AdminDashboard = () => {
         if(socket) {
             socket.off('new-order');
             socket.off('order-status-updated');
-            socket.off('table-update'); // ✅ Clean up
+            socket.off('table-update');
         }
     }
   }, [socket]);
 
   const { summary, recentOrders, stockAlerts } = data;
 
+  // ✅ Common style for clickable cards
+  const cardStyle = "bg-[#fff2e0] rounded-xl p-5 shadow-md border border-[#6e1a1a] cursor-pointer transition-transform hover:scale-105 hover:shadow-lg";
+
   return (
     <div className="min-h-screen bg-[#480c1b] text-black p-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        {/* Total Sales */}
-        <div className="bg-[#fff2e0] rounded-xl p-5 shadow-md border border-[#6e1a1a]">
+        
+        {/* Total Sales -> Switch to Analytics Tab */}
+        <div 
+            className={cardStyle}
+            onClick={() => onNavigate('analytics')}
+        >
           <div className="flex justify-between items-center mb-2">
             <CircleDollarSign className="text-orange-400" size={28} />
             <span
@@ -78,8 +87,11 @@ const AdminDashboard = () => {
           </p>
         </div>
 
-        {/* Active Orders */}
-        <div className="bg-[#fff2e0] rounded-xl p-5 shadow-md border border-[#6e1a1a]">
+        {/* Active Orders -> Switch to Orders Tab */}
+        <div 
+            className={cardStyle}
+            onClick={() => onNavigate('orders')}
+        >
           <div className="flex justify-between items-center mb-2">
             <ShoppingCart className="text-blue-400" size={28} />
             <span
@@ -96,8 +108,11 @@ const AdminDashboard = () => {
           <p className="text-3xl font-bold mt-1">{summary.activeOrders}</p>
         </div>
 
-        {/* Low Stock */}
-        <div className="bg-[#fff2e0] rounded-xl p-5 shadow-md border border-[#6e1a1a]">
+        {/* Low Stock -> Navigate to /kitchen/inventory URL */}
+        <div 
+            className={cardStyle}
+            onClick={() => navigate('/kitchen/inventory')}
+        >
           <div className="flex justify-between items-center mb-2">
             <Box className="text-red-400" size={28} />
             {summary.lowStock >= 3 ? (
@@ -110,8 +125,11 @@ const AdminDashboard = () => {
           <p className="text-3xl font-bold mt-1">{summary.lowStock}</p>
         </div>
 
-        {/* ✅ CHANGED: Available Tables */}
-        <div className="bg-[#fff2e0] rounded-xl p-5 shadow-md border border-[#6e1a1a]">
+        {/* Available Tables -> Switch to Tables Tab */}
+        <div 
+            className={cardStyle}
+            onClick={() => onNavigate('tables')}
+        >
           <div className="flex justify-between items-center mb-2">
             <Armchair className="text-green-600" size={28} />
           </div>

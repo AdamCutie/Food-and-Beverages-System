@@ -263,7 +263,7 @@ function AdminPage() {
           </nav>
 
           <main>
-            {currentView === 'dashboard' && <AdminDashboard />}
+            {currentView === 'dashboard' && <AdminDashboard onNavigate={setCurrentView} />}
             {currentView === 'analytics' && <AnalyticsDashboard />}
             {!loading && !error && currentView === 'promotions' && <PromotionsManagement />}
             
