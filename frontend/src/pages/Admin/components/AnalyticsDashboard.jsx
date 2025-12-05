@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import apiClient from "../../../utils/apiClient";
 import toast from "react-hot-toast";
-import { Printer, Filter, Download } from "lucide-react"; 
+import { Filter, Download, FileSpreadsheet } from "lucide-react"; // ✅ Added FileSpreadsheet icon
 import * as XLSX from "xlsx";
 import {
   ResponsiveContainer,
@@ -58,54 +58,98 @@ const AnalyticsDashboard = () => {
     if (token) fetchAnalytics();
   }, [token, filterType]);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // ✅ NEW: Reusable Excel Export Function
-  const exportToExcel = (dataToExport, fileName) => {
+  // ✅ HELPER: Creates a professional worksheet with Title, Date, and Totals
+  const createSheet = (dataToExport, reportTitle) => {
     if (!dataToExport || dataToExport.length === 0) {
-      toast.error("No data to export.");
-      return;
+      // Return empty sheet if no data
+      return XLSX.utils.json_to_sheet([]);
     }
 
-    // 1. Create the Worksheet
-    // We start the data at "A4" to leave room for the title at the top
+    // 1. Convert Data to Sheet (starting at A4)
     const worksheet = XLSX.utils.json_to_sheet(dataToExport, { origin: "A4" });
 
-    // 2. Add a Title and Timestamp at the top (Rows 1 and 2)
-    const title = [{ v: fileName.replace(/_/g, " ").toUpperCase(), t: "s" }];
+    // 2. Add Header Info (Title & Date)
+    const title = [{ v: reportTitle.toUpperCase(), t: "s" }];
     const date = [{ v: `Generated: ${new Date().toLocaleString()}`, t: "s" }];
-    
     XLSX.utils.sheet_add_aoa(worksheet, [title, date], { origin: "A1" });
 
-    // 3. Calculate Totals (Auto-sum numeric columns)
+    // 3. Calculate Totals Row
     const totalRow = {};
     const firstItem = dataToExport[0];
-    
-    // Loop through keys to find numbers
     Object.keys(firstItem).forEach(key => {
-      // If the first column (usually ID or Name), write "TOTAL"
       if (key === Object.keys(firstItem)[0]) {
         totalRow[key] = "TOTALS:";
-      } 
-      // If it's a number, sum it up
-      else if (typeof firstItem[key] === 'number') {
+      } else if (typeof firstItem[key] === 'number') {
         const sum = dataToExport.reduce((acc, curr) => acc + (curr[key] || 0), 0);
         totalRow[key] = sum;
-      } 
-      // Otherwise leave blank
-      else {
+      } else {
         totalRow[key] = "";
       }
     });
 
-    // 4. Append the Total Row at the bottom
+    // 4. Append Total Row
     XLSX.utils.sheet_add_json(worksheet, [totalRow], { origin: -1, skipHeader: true });
 
-    // 5. Create Workbook and Download
+    return worksheet;
+  };
+
+  // ✅ NEW: Export ALL Data to One Excel File
+  const handleExportAll = () => {
+    if (!data) return;
+
+    // 1. Prepare Data Sets
+    const salesData = [
+      { name: "Today", sales: data.salesTrends.today?.sales || 0, orders: data.salesTrends.today?.fb_orders || 0 },
+      { name: "Yesterday", sales: data.salesTrends.yesterday?.sales || 0, orders: data.salesTrends.yesterday?.fb_orders || 0 },
+      { name: "This Week", sales: data.salesTrends.thisWeek?.sales || 0, orders: data.salesTrends.thisWeek?.fb_orders || 0 },
+      { name: "This Month", sales: data.salesTrends.thisMonth?.sales || 0, orders: data.salesTrends.thisMonth?.fb_orders || 0 },
+    ].map(d => ({ Period: d.name, 'Total Sales (PHP)': d.sales, 'Total Orders': d.orders }));
+
+    const orderData = data.orderTypeDistribution.map((o) => ({
+      'Order Type': o.order_type,
+      'Order Count': o.orders,
+      'Total Revenue': Number(o.total_value) || 0
+    }));
+
+    const itemsData = data.topSellingItems.map((i, index) => ({
+      Rank: index + 1,
+      'Item Name': i.item_name,
+      'Quantity Sold': i.total_sold,
+      'Total Sales (PHP)': i.total_sales
+    }));
+
+    const paymentData = (data.paymentMethods || []).map((method) => ({
+      'Payment Method': method.payment_method,
+      'Transactions': method.transactions,
+      'Total Value (PHP)': Number(method.total_value) || 0
+    }));
+
+    // 2. Create Workbook
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
+
+    // 3. Create Sheets using the Helper and Append to Workbook
+    const sheet1 = createSheet(salesData, "Sales Trends Report");
+    XLSX.utils.book_append_sheet(workbook, sheet1, "Sales Trends");
+
+    const sheet2 = createSheet(orderData, "Order Type Report");
+    XLSX.utils.book_append_sheet(workbook, sheet2, "Order Types");
+
+    const sheet3 = createSheet(itemsData, "Top Selling Items");
+    XLSX.utils.book_append_sheet(workbook, sheet3, "Top Items");
+
+    const sheet4 = createSheet(paymentData, "Payment Methods");
+    XLSX.utils.book_append_sheet(workbook, sheet4, "Payments");
+
+    // 4. Download
+    XLSX.writeFile(workbook, `Daily_Sales_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success("Full Daily Report Downloaded!");
+  };
+
+  // ✅ Keep this for the individual card buttons (uses the same helper logic internally)
+  const exportToExcel = (dataToExport, fileName, sheetName) => {
+    const worksheet = createSheet(dataToExport, fileName.replace(/_/g, " "));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName || "Report");
     XLSX.writeFile(workbook, `${fileName}.xlsx`);
     toast.success(`${fileName}.xlsx downloaded!`);
   };
@@ -114,9 +158,7 @@ const AnalyticsDashboard = () => {
   if (error) return <div className="p-8 text-center text-red-500">Error: {error}</div>;
   if (!data) return <div className="p-8 text-center text-white">No data available.</div>;
 
-  // --- PREPARE DATA FOR CHARTS AND EXPORTS ---
-
-  // 1. Sales Trend Data
+  // --- PREPARE DATA FOR CHARTS (For Display) ---
   const salesTrendData = [
     { name: "Today", sales: data.salesTrends.today?.sales || 0, orders: data.salesTrends.today?.fb_orders || 0 },
     { name: "Yesterday", sales: data.salesTrends.yesterday?.sales || 0, orders: data.salesTrends.yesterday?.fb_orders || 0 },
@@ -124,21 +166,18 @@ const AnalyticsDashboard = () => {
     { name: "This Month", sales: data.salesTrends.thisMonth?.sales || 0, orders: data.salesTrends.thisMonth?.fb_orders || 0 },
   ];
 
-  // 2. Order Type Data
   const orderTypeData = data.orderTypeDistribution.map((o) => ({
     name: o.order_type,
     value: o.orders,
-    revenue: o.total_value // Added revenue for better export data
+    revenue: o.total_value
   }));
 
-  // 3. Payment Method Data
   const paymentMethodData = (data.paymentMethods || []).map((method) => ({
     name: method.payment_method,
     value: Number(method.total_value) || 0,
     count: method.transactions
   }));
 
-  // 4. Top Items Data
   const topItemsData = data.topSellingItems.map((i) => ({
     name: i.item_name,
     sold: i.total_sold,
@@ -149,7 +188,7 @@ const AnalyticsDashboard = () => {
     <div className="w-full">
       
       {/* --- CONTROLS AREA --- */}
-      <div className="flex flex-col sm:flex-row justify-end items-center gap-4 mb-6 no-print">
+      <div className="flex flex-col sm:flex-row justify-end items-center gap-4 mb-6">
         <div className="relative">
             <select
               value={filterType}
@@ -167,31 +206,29 @@ const AnalyticsDashboard = () => {
             </div>
         </div>
 
+        {/* ✅ UPDATED: Export All Button */}
         <button
-          onClick={handlePrint}
+          onClick={handleExportAll}
           className="flex items-center gap-2 px-6 py-3 rounded-lg font-bold transition-transform hover:scale-105 shadow-lg"
           style={{ backgroundColor: '#F9A825', color: '#3C2A21' }}
         >
-          <Printer size={20} />
-          Print Report
+          <FileSpreadsheet size={20} />
+          Export Report
         </button>
       </div>
 
-      {/* --- PRINTABLE DASHBOARD --- */}
-      <div id="printable-dashboard" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* CARD 1: Sales Trends */}
         <div className="admin-card bg-[#fff2e0] p-6 rounded-xl shadow-md border border-[#6e1a1a]">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold" style={{ color: '#3C2A21' }}>Sales Trends</h3>
-            {/* ✅ Export Button 1 */}
             <button 
               onClick={() => exportToExcel(
                 salesTrendData.map(d => ({ Period: d.name, 'Total Sales (PHP)': d.sales, 'Total Orders': d.orders })), 
                 'Sales_Trends_Report'
               )}
-              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors no-print"
-              title="Export to Excel"
+              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors"
             >
               <Download size={20} />
             </button>
@@ -213,14 +250,12 @@ const AnalyticsDashboard = () => {
         <div className="admin-card bg-[#fff2e0] p-6 rounded-xl shadow-md border border-[#6e1a1a] flex flex-col">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold" style={{ color: '#3C2A21' }}>Order Type Distribution</h3>
-            {/* ✅ Export Button 2 */}
             <button 
               onClick={() => exportToExcel(
-                orderTypeData.map(d => ({ 'Order Type': d.name, 'Order Count': d.value, 'Total Revenue': d.revenue })), 
+                orderTypeData.map(d => ({ 'Order Type': d.name, 'Order Count': d.value, 'Total Revenue': Number(d.revenue) })), 
                 'Order_Type_Report'
               )}
-              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors no-print"
-              title="Export to Excel"
+              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors"
             >
               <Download size={20} />
             </button>
@@ -249,14 +284,12 @@ const AnalyticsDashboard = () => {
         <div className="admin-card bg-[#fff2e0] p-6 rounded-xl shadow-md border border-[#6e1a1a]">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold" style={{ color: '#3C2A21' }}>Top Selling Items</h3>
-            {/* ✅ Export Button 3 */}
             <button 
               onClick={() => exportToExcel(
                 topItemsData.map((d, index) => ({ Rank: index + 1, 'Item Name': d.name, 'Quantity Sold': d.sold, 'Total Sales (PHP)': d.sales })), 
                 'Top_Selling_Items_Report'
               )}
-              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors no-print"
-              title="Export to Excel"
+              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors"
             >
               <Download size={20} />
             </button>
@@ -277,14 +310,12 @@ const AnalyticsDashboard = () => {
         <div className="admin-card bg-[#fff2e0] p-6 rounded-xl shadow-md border border-[#6e1a1a]">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold" style={{ color: '#3C2A21' }}>Payment Methods</h3>
-            {/* ✅ Export Button 4 */}
             <button 
               onClick={() => exportToExcel(
                 paymentMethodData.map(d => ({ 'Payment Method': d.name, 'Transactions': d.count, 'Total Value (PHP)': d.value })), 
                 'Payment_Methods_Report'
               )}
-              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors no-print"
-              title="Export to Excel"
+              className="text-[#3C2A21] hover:text-[#F9A825] transition-colors"
             >
               <Download size={20} />
             </button>
