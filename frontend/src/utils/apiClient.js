@@ -1,7 +1,9 @@
 import toast from 'react-hot-toast';
 
 // The base URL for your API
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = import.meta.env.MODE === 'development' 
+  ? 'http://localhost:21917/api' 
+  : '/api';
 
 /**
  * A wrapper around the native fetch function that automatically:
