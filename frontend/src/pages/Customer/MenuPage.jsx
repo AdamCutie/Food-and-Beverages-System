@@ -26,6 +26,7 @@ function MenuPage() {
   const [orderType, setOrderType] = useState('Dine-in');
   const [deliveryLocation, setDeliveryLocation] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [sortOption, setSortOption] = useState('a-z');
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
@@ -328,9 +329,39 @@ const handleConfirmPayment = async (paymentInfo) => {
     }
   };
 
-  const filteredItems = items
-    .filter(item => selectedCategory === 0 || item.category_id === selectedCategory)
-    .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
+ // --- FILTERING & SORTING LOGIC ---
+  const getProcessedItems = () => {
+    // 1. Filter by Category and Search
+    let result = items
+      .filter(item => selectedCategory === 0 || item.category_id === selectedCategory)
+      .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // 2. Sort the result
+    switch (sortOption) {
+      case 'a-z':
+        result.sort((a, b) => a.item_name.localeCompare(b.item_name));
+        break;
+      case 'z-a':
+        result.sort((a, b) => b.item_name.localeCompare(a.item_name));
+        break;
+      case 'price-low':
+        result.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+        break;
+      case 'price-high':
+        result.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+        break;
+      case 'recent':
+        // Sort by ID descending (Higher ID = Newer item)
+        result.sort((a, b) => b.item_id - a.item_id); 
+        break;
+      default:
+        break;
+    }
+
+    return result;
+  };
+
+  const finalItems = getProcessedItems();
 
   return (
     <div className="customer-page-container">
@@ -349,9 +380,11 @@ const handleConfirmPayment = async (paymentInfo) => {
           categories={categories}
           selectedCategory={selectedCategory}
           onSelectCategory={handleSelectCategory}
+          sortOption={sortOption}
+          onSortChange={setSortOption}
         />
         <FoodGrid
-        items={filteredItems}
+        items={finalItems}
         onAddToCart={handleAddToCart}
         onImageClick={(imageUrl) => setSelectedImage(imageUrl)}
       />

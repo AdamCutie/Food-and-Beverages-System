@@ -685,3 +685,53 @@
   justify-content: center;
   border-radius: 9999px;
 }
+
+/* Wrapper for the button and the dropdown */
+.filter-wrapper {
+  position: relative; /* Allows absolute positioning of the dropdown inside */
+  display: inline-flex;
+  margin-left: 5px; /* Space between last category and filter */
+}
+
+/* Specific style for the filter trigger button */
+.filter-trigger {
+  display: flex;
+  align-items: center;
+  background-color: var(--customer-bg-color); /* Default gray like other tabs */
+}
+
+/* The actual dropdown box */
+.filter-dropdown-menu {
+  position: absolute;
+  top: 110%; /* Shows just below the button */
+  right: 0;   /* Aligns to the right edge of the button */
+  width: 200px; /* Wider than the button to show text */
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100; /* Ensure it floats above other content */
+  overflow: hidden;
+  padding: 5px 0;
+}
+
+/* Individual options inside the dropdown */
+.filter-option {
+  padding: 10px 15px;
+  font-size: 0.9rem;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-align: left;
+}
+
+.filter-option:hover {
+  background-color: #f7f7f7;
+}
+
+/* Highlight the currently selected sort option */
+.filter-option.selected {
+  font-weight: 600;
+  color: #FF5E00; /* Your brand orange */
+  background-color: #fff0e6;
+}
