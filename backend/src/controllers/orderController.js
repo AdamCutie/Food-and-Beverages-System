@@ -420,7 +420,7 @@ export const getOrderById = async (req, res) => {
             items_total: order.items_total,
             service_charge_amount: order.service_charge_amount,
             vat_amount: order.vat_amount,
-            total_price: order.total_amount,
+            total_amount: order.total_amount,
             status: order.status,
             items,
             payment_method: payment.payment_method || "PayMongo",

@@ -93,9 +93,9 @@ const ReceiptModal = ({ isOpen, onClose, orderDetails }) => {
           <h4 className="font-semibold mb-2 text-gray-800">Items Ordered:</h4>
           <div className="space-y-1 text-sm text-gray-700 max-h-32 overflow-y-auto pr-2">
             {items.map((item, index) => (
-              <div key={item.item_id || index} className="flex justify-between items-center">
+              <div key={item.order_detail_id || index} className="flex justify-between items-center">
                 <span>{item.quantity} x {item.item_name}</span>
-                <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+                <span>₱{parseFloat(item.subtotal || 0).toFixed(2)}</span>
               </div>
             ))}
           </div>
