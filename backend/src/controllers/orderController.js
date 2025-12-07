@@ -565,16 +565,17 @@ export const getKitchenOrders = async (req, res) => {
     }
 };
 
-// @desc    Get served/completed orders
+// @desc    Get served AND cancelled orders (Archived)
 // @route   GET /api/orders/served
 // @access  Private (Staff)
 export const getServedOrders = async (req, res) => {
     try {
+        // UPDATED: Now fetches 'cancelled' orders as well
         const sql = `
             SELECT o.*, c.first_name, c.last_name
             FROM fb_orders o
             LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
-            WHERE o.status = 'served'
+            WHERE o.status IN ('served', 'cancelled')
             ORDER BY o.order_date DESC
         `;
         const [orders] = await pool.query(sql);
