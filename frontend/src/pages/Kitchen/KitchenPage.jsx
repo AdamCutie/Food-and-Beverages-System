@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Trash2, Clock, Package, CheckCircle, CheckCircle2 } from 'lucide-react';
+import { Trash2, Clock, Package, CheckCircle, CheckCircle2, Calendar } from 'lucide-react'; // Added Calendar Icon
 import InternalNavBar from './components/InternalNavBar';
 import apiClient from '../../utils/apiClient';
 import './KitchenTheme.css'; 
@@ -9,8 +9,13 @@ import { useSocket } from '../../context/SocketContext';
 function KitchenPage() {
   const [kitchenOrders, setKitchenOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // FILTERS
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterType, setFilterType] = useState('All Types');
+  // Default to today's date (Format: YYYY-MM-DD)
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+
   const [servedCount, setServedCount] = useState(0);
 
   const { socket } = useSocket();
@@ -53,15 +58,11 @@ function KitchenPage() {
 
     // --- REAL-TIME LISTENERS ---
     if (socket) {
-        // 1. New Order: Add to list instantly
         socket.on('new-order', async (data) => {
             console.log('🆕 New order received:', data);
             
-            // ✅ FIX: Check if we have full order data or need to fetch
             let fullOrder;
-            
             if (data.items && data.first_name) {
-                // We have complete data from socket
                 fullOrder = {
                     order_id: data.order_id,
                     order_date: data.order_date || new Date().toISOString(),
@@ -74,15 +75,13 @@ function KitchenPage() {
                     items: data.items || []
                 };
             } else {
-                // Fetch full details
                 fullOrder = await fetchOrderDetails(data.order_id);
             }
             
             if (fullOrder) {
                 setKitchenOrders(prev => {
-                    // Prevent duplicates
                     if (prev.find(o => o.order_id === fullOrder.order_id)) return prev;
-                    return [fullOrder, ...prev]; // Add to top
+                    return [fullOrder, ...prev]; 
                 });
                 toast.success(`New Order #${data.order_id} Received!`, {
                     duration: 3000,
@@ -91,35 +90,28 @@ function KitchenPage() {
             }
         });
 
-        // 2. Status Update: Update card instantly
         socket.on('order-status-updated', (data) => {
             console.log('🔄 Order status updated:', data);
             
             setKitchenOrders(prev => {
                 const { order_id, status } = data;
                 
-                // Remove if Served or Cancelled
                 if (status === 'served' || status === 'cancelled') {
                     if (status === 'served') setServedCount(c => c + 1);
                     
-                    // Show feedback
                     const orderName = prev.find(o => o.order_id === order_id);
                     if (orderName) {
                         toast.success(`Order #${order_id} ${status === 'served' ? 'Served' : 'Cancelled'}`, {
                             duration: 2000
                         });
                     }
-                    
                     return prev.filter(o => o.order_id !== order_id);
                 }
-                
-                // Update status locally
                 return prev.map(o => o.order_id === order_id ? { ...o, status } : o);
             });
         });
     }
 
-    // Cleanup listeners
     return () => {
         if(socket) {
             socket.off('new-order');
@@ -128,7 +120,6 @@ function KitchenPage() {
     };
   }, [socket]);
 
-  // Handle local clicks
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
       const response = await apiClient(`/orders/${orderId}/status`, {
@@ -140,18 +131,34 @@ function KitchenPage() {
         const error = await response.json();
         throw new Error(error.message || 'Failed to update status');
       }
-      
-      // Socket will handle UI update
     } catch (err) {
       toast.error(err.message);
     }
   };
 
-  // --- FILTERS & COUNTS ---
+  // --- FILTERS LOGIC ---
+  const handleFilterClick = (status) => {
+    if (filterStatus === status) {
+        setFilterStatus('All');
+    } else {
+        setFilterStatus(status);
+    }
+  };
+
+  // Updated filtering to include Date
   const filteredOrders = kitchenOrders.filter(order => {
+    // 1. Status Filter
     const statusMatch = filterStatus === 'All' || order.status?.toLowerCase() === filterStatus.toLowerCase();
+    
+    // 2. Type Filter
     const typeMatch = filterType === 'All Types' || order.order_type?.toLowerCase() === filterType.toLowerCase();
-    return statusMatch && typeMatch;
+    
+    // 3. Date Filter
+    // Extract YYYY-MM-DD from the order's ISO string
+    const orderDatePart = new Date(order.order_date).toISOString().split('T')[0];
+    const dateMatch = orderDatePart === filterDate;
+
+    return statusMatch && typeMatch && dateMatch;
   });
 
   const pendingCount = kitchenOrders.filter(o => o.status?.toLowerCase() === 'pending').length;
@@ -167,7 +174,6 @@ function KitchenPage() {
     }
   };
 
-  // ✅ FIX: Format time to local timezone
   const formatOrderTime = (dateString) => {
     try {
       const date = new Date(dateString);
@@ -188,37 +194,66 @@ function KitchenPage() {
       <div className="kitchen-container">
         <h1 className="kitchen-title">Kitchen Order Display (Live)</h1>
 
-        {/* Summary Cards */}
+        {/* CLICKABLE SUMMARY CARDS */}
         <div className="summary-grid">
-            <div className="summary-box">
-                <div><h3 className="font-bold text-sm uppercase">Pending</h3><p className="text-3xl font-bold">{pendingCount}</p></div>
-                <div className="p-3 rounded-full bg-amber-500 text-white"><Clock size={24}/></div>
+            {/* Pending Card */}
+            <div 
+                onClick={() => handleFilterClick('Pending')}
+                className={`summary-box cursor-pointer transition-all duration-200 ${filterStatus === 'Pending' ? 'ring-4 ring-amber-400 scale-105 bg-amber-100' : 'hover:scale-105'}`}
+            >
+                <div>
+                    <h3 className="font-bold text-sm uppercase text-gray-700">Pending</h3>
+                    <p className="text-3xl font-bold text-gray-900">{pendingCount}</p>
+                </div>
+                <div className={`p-3 rounded-full text-white ${filterStatus === 'Pending' ? 'bg-amber-600' : 'bg-amber-500'}`}>
+                    <Clock size={24}/>
+                </div>
             </div>
-            <div className="summary-box">
-                <div><h3 className="font-bold text-sm uppercase">Preparing</h3><p className="text-3xl font-bold">{preparingCount}</p></div>
-                <div className="p-3 rounded-full bg-blue-500 text-white"><Package size={24}/></div>
+
+            {/* Preparing Card */}
+            <div 
+                onClick={() => handleFilterClick('Preparing')}
+                className={`summary-box cursor-pointer transition-all duration-200 ${filterStatus === 'Preparing' ? 'ring-4 ring-blue-400 scale-105 bg-blue-100' : 'hover:scale-105'}`}
+            >
+                <div>
+                    <h3 className="font-bold text-sm uppercase text-gray-700">Preparing</h3>
+                    <p className="text-3xl font-bold text-gray-900">{preparingCount}</p>
+                </div>
+                <div className={`p-3 rounded-full text-white ${filterStatus === 'Preparing' ? 'bg-blue-600' : 'bg-blue-500'}`}>
+                    <Package size={24}/>
+                </div>
             </div>
-            <div className="summary-box">
-                <div><h3 className="font-bold text-sm uppercase">Ready</h3><p className="text-3xl font-bold">{readyCount}</p></div>
-                <div className="p-3 rounded-full bg-green-500 text-white"><CheckCircle size={24}/></div>
+
+            {/* Ready Card */}
+            <div 
+                onClick={() => handleFilterClick('Ready')}
+                className={`summary-box cursor-pointer transition-all duration-200 ${filterStatus === 'Ready' ? 'ring-4 ring-green-400 scale-105 bg-green-100' : 'hover:scale-105'}`}
+            >
+                <div>
+                    <h3 className="font-bold text-sm uppercase text-gray-700">Ready</h3>
+                    <p className="text-3xl font-bold text-gray-900">{readyCount}</p>
+                </div>
+                <div className={`p-3 rounded-full text-white ${filterStatus === 'Ready' ? 'bg-green-600' : 'bg-green-500'}`}>
+                    <CheckCircle size={24}/>
+                </div>
             </div>
-            <div className="summary-box">
-                <div><h3 className="font-bold text-sm uppercase">Served</h3><p className="text-3xl font-bold">{servedCount}</p></div>
-                <div className="p-3 rounded-full bg-gray-500 text-white"><CheckCircle2 size={24}/></div>
+
+            {/* Served Card */}
+            <div className="summary-box opacity-90">
+                <div>
+                    <h3 className="font-bold text-sm uppercase text-gray-700">Served</h3>
+                    <p className="text-3xl font-bold text-gray-900">{servedCount}</p>
+                </div>
+                <div className="p-3 rounded-full bg-gray-500 text-white">
+                    <CheckCircle2 size={24}/>
+                </div>
             </div>
         </div>
 
-        {/* Filters */}
-        <div className="filter-container">
-            <div className="flex-1">
-                <label className="block text-sm font-bold mb-1 text-[#F9A825]">Filter by Status</label>
-                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="w-full p-2 rounded border border-gray-300">
-                    <option value="All">All</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Preparing">Preparing</option>
-                    <option value="Ready">Ready</option>
-                </select>
-            </div>
+        {/* Filters Row */}
+        <div className="filter-container items-end">
+            
+            {/* Filter by Type */}
             <div className="flex-1">
                 <label className="block text-sm font-bold mb-1 text-[#F9A825]">Filter by Type</label>
                 <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full p-2 rounded border border-gray-300">
@@ -229,12 +264,45 @@ function KitchenPage() {
                     <option value="Phone Order">Phone Order</option>
                 </select>
             </div>
+
+            {/* Filter by Date */}
+            <div className="flex-1">
+                <label className="block text-sm font-bold mb-1 text-[#F9A825]">Filter by Date</label>
+                <div className="relative">
+                    <input 
+                        type="date" 
+                        value={filterDate} 
+                        onChange={(e) => setFilterDate(e.target.value)} 
+                        className="w-full p-2 pl-2 rounded border border-gray-300"
+                    />
+                </div>
+            </div>
+            
+            {/* Reset Button */}
+            <div className="flex-1 flex items-center justify-start pb-2">
+               {filterStatus !== 'All' && (
+                 <button 
+                    onClick={() => setFilterStatus('All')}
+                    className="text-sm text-gray-500 hover:text-[#F9A825] underline ml-2"
+                 >
+                    Reset Status Filter
+                 </button>
+               )}
+            </div>
         </div>
 
         {loading ? (
             <div className="text-center text-white text-xl py-10">Loading active orders...</div>
         ) : filteredOrders.length === 0 ? (
-            <div className="text-center text-gray-400 text-lg py-10">No orders found.</div>
+            <div className="text-center text-gray-400 text-lg py-10 flex flex-col items-center">
+                <p>No orders found for {filterDate}.</p>
+                {filterStatus !== 'All' && <p className="text-sm">Filter: {filterStatus}</p>}
+                
+                {/* Helper hint for user testing */}
+                {new Date(filterDate).toDateString() === new Date().toDateString() && (
+                     <p className="text-xs text-gray-500 mt-2 italic">(Tip: If you are testing with old sample data, try changing the date)</p>
+                )}
+            </div>
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredOrders.map(order => {
