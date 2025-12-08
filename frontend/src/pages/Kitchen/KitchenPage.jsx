@@ -64,6 +64,7 @@ function KitchenPage() {
     }
   };
 
+  // Initial Data Load
   const fetchInitialData = async () => {
     setLoading(true);
     try {
@@ -74,7 +75,21 @@ function KitchenPage() {
       const ordersList = await kitchenResponse.json();
       const servedList = await servedResponse.json();
       
-      setServedCount(servedList.filter(o => o.status === 'served').length);
+      // ✅ UPDATED LOGIC: Count only items served TODAY
+      const todayDate = getLocalTodayStr(); // Get "2025-12-08"
+      
+      const todayServedCount = servedList.filter(o => {
+          // 1. Must be served
+          const isServed = o.status === 'served';
+          
+          // 2. Must be from today (using our timezone helpers)
+          const orderDatePart = getLocalDatePart(fixDate(o.order_date));
+          const isToday = orderDatePart === todayDate;
+          
+          return isServed && isToday;
+      }).length;
+
+      setServedCount(todayServedCount);
 
       const ordersWithDetails = await Promise.all(
         ordersList.map(order => fetchOrderDetails(order.order_id))
@@ -303,7 +318,7 @@ function KitchenPage() {
                 className="summary-box cursor-pointer hover:scale-105 transition-transform duration-200 hover:ring-4 hover:ring-gray-300"
                 title="View Archive"
             >
-                <div><h3 className="font-bold text-sm uppercase text-gray-700">Served</h3><p className="text-3xl font-bold text-gray-900">{servedCount}</p></div>
+                <div><h3 className="font-bold text-sm uppercase text-gray-700">Served Today</h3><p className="text-3xl font-bold text-gray-900">{servedCount}</p></div>
                 <div className="p-3 rounded-full bg-gray-500 text-white"><CheckCircle2 size={24}/></div>
             </div>
         </div>
