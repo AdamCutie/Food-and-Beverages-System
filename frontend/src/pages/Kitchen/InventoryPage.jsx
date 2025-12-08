@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Sliders, Edit2 } from 'lucide-react';
+import { Plus, Sliders, Edit2, AlertTriangle, CheckCircle, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import InternalNavBar from './components/InternalNavBar';
-import IngredientModal from './components/IngredientModal'; 
-import AdjustStockModal from './components/AdjustStockModal'; 
-import apiClient from '../../utils/apiClient'; 
+import apiClient from '../../utils/apiClient';
+// ✅ Reverted to KitchenTheme (No Admin Import)
 import './KitchenTheme.css'; 
 
-// 👇 1. Import Socket Hook
+// Import Modals
+import IngredientModal from './components/IngredientModal'; 
+import AdjustStockModal from './components/AdjustStockModal'; 
+import InternalNavBar from './components/InternalNavBar';
 import { useSocket } from '../../context/SocketContext';
 
 const InventoryPage = () => {
@@ -16,10 +17,13 @@ const InventoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { token } = useAuth();
-
-  // 👇 2. Get Socket Instance
   const { socket } = useSocket();
 
+  // --- FILTERS & SORTING STATE ---
+  const [filterStatus, setFilterStatus] = useState('All'); 
+  const [sortBy, setSortBy] = useState('stock-low'); 
+
+  // --- MODAL STATE ---
   const [isIngredientModalOpen, setIsIngredientModalOpen] = useState(false);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
@@ -35,7 +39,6 @@ const InventoryPage = () => {
     } catch (err) {
        if (err.message !== 'Session expired') {
         setError(err.message);
-        // Don't toast on background refresh to avoid spam
         if (!isBackground) toast.error(err.message);
       }
     } finally {
@@ -46,18 +49,9 @@ const InventoryPage = () => {
   useEffect(() => {
     if (token) fetchIngredients();
 
-    // 👇 3. Add Socket Listeners
     if (socket) {
-        // When an order is placed or status changes, stock might change
-        socket.on('new-order', () => {
-            console.log("📦 Order placed, refreshing inventory...");
-            fetchIngredients(true); // true = background refresh (no loading spinner)
-        });
-
-        socket.on('order-status-updated', () => {
-            // E.g. Order cancelled -> Stock restored
-            fetchIngredients(true);
-        });
+        socket.on('new-order', () => { fetchIngredients(true); });
+        socket.on('order-status-updated', () => { fetchIngredients(true); });
     }
 
     return () => {
@@ -68,18 +62,11 @@ const InventoryPage = () => {
     };
   }, [token, socket]);
 
-  const handleOpenAddModal = () => {
-    setSelectedIngredient(null);
-    setIsIngredientModalOpen(true);
-  };
-  const handleOpenEditModal = (ing) => {
-    setSelectedIngredient(ing);
-    setIsIngredientModalOpen(true);
-  };
-  const handleOpenAdjustModal = (ing) => {
-    setSelectedIngredient(ing);
-    setIsAdjustModalOpen(true);
-  };
+  // --- HANDLERS ---
+  const handleOpenAddModal = () => { setSelectedIngredient(null); setIsIngredientModalOpen(true); };
+  const handleOpenEditModal = (ing) => { setSelectedIngredient(ing); setIsIngredientModalOpen(true); };
+  const handleOpenAdjustModal = (ing) => { setSelectedIngredient(ing); setIsAdjustModalOpen(true); };
+  
   const handleCloseModals = () => {
     setIsIngredientModalOpen(false);
     setIsAdjustModalOpen(false);
@@ -96,9 +83,7 @@ const InventoryPage = () => {
       toast.success(`Ingredient ${isEditMode ? 'updated' : 'created'}!`);
       handleCloseModals();
       fetchIngredients(true); 
-    } catch (err) {
-       toast.error(err.message);
-    }
+    } catch (err) { toast.error(err.message); }
   };
 
   const handleAdjustStock = async (formData) => {
@@ -111,67 +96,160 @@ const InventoryPage = () => {
         toast.success('Stock adjusted!');
         handleCloseModals();
         fetchIngredients(true); 
-    } catch (err) {
-       toast.error(err.message);
-    }
+    } catch (err) { toast.error(err.message); }
   };
+
+  // --- FILTER & SORT LOGIC ---
+  const getProcessedIngredients = () => {
+      // 1. Filter
+      let result = ingredients.filter(item => {
+          const current = parseFloat(item.stock_level);
+          const threshold = parseFloat(item.reorder_point || 10);
+          const isLow = current <= threshold;
+
+          if (filterStatus === 'Low Stock') return isLow;
+          if (filterStatus === 'Good') return !isLow;
+          return true; // 'All'
+      });
+
+      // 2. Sort
+      result.sort((a, b) => {
+          const stockA = parseFloat(a.stock_level);
+          const stockB = parseFloat(b.stock_level);
+
+          switch (sortBy) {
+              case 'stock-low': return stockA - stockB; // Lowest first
+              case 'stock-high': return stockB - stockA; // Highest first
+              case 'name': return a.name.localeCompare(b.name); // A-Z
+              default: return 0;
+          }
+      });
+
+      return result;
+  };
+
+  const filteredList = getProcessedIngredients();
 
   return (
     <>
       <InternalNavBar />
       <div className="kitchen-page">
-        
-        {/* Header Row */}
-        <div className="kitchen-header-row">
-          <h1 className="kitchen-title" style={{marginBottom: 0}}>Inventory Management</h1>
-          <button onClick={handleOpenAddModal} className="kitchen-btn btn-accent">
-            <Plus size={20} /> Add Ingredient
-          </button>
-        </div>
+        <div className="kitchen-container">
+            
+            {/* 1. HEADER ROW */}
+            <div className="kitchen-header-row">
+                <div>
+                    <h1 className="kitchen-title mb-1">Inventory Management</h1>
+                    <p className="text-sm text-gray-300">Total Ingredients: {ingredients.length}</p>
+                </div>
 
-        {loading ? (
-            <div className="text-center text-white text-xl py-10">Loading inventory...</div>
-        ) : error ? (
-            <div className="text-center text-red-500 text-xl py-10">Error: {error}</div>
-        ) : (
-            <div className="kitchen-table-container">
-            <table className="kitchen-table">
-                <thead>
-                <tr>
-                    <th>Ingredient Name</th>
-                    <th className="text-center">Current Stock</th>
-                    <th>Unit</th>
-                    <th className="text-center">Actions</th>
-                </tr>
-                </thead>
-                <tbody>
-                {ingredients.map((item) => (
-                    <tr key={item.ingredient_id}>
-                    <td className="font-bold">{item.name}</td>
-                    <td className="text-center font-bold text-lg">
-                        {parseFloat(item.stock_level).toFixed(2)}
-                    </td>
-                    <td className="text-sm opacity-80">{item.unit_of_measurement}</td>
-                    <td className="text-center">
-                        <div className="flex justify-center gap-4">
-                        <button onClick={() => handleOpenAdjustModal(item)} className="text-blue-600 hover:underline flex items-center gap-1">
-                            <Sliders size={16} /> Adjust
-                        </button>
-                        <button onClick={() => handleOpenEditModal(item)} className="text-gray-600 hover:underline flex items-center gap-1">
-                            <Edit2 size={16} /> Edit
-                        </button>
+                <div className="flex flex-wrap items-center gap-4 justify-end">
+                    
+                    {/* Filter Dropdown (Orange) */}
+                    <div className="relative">
+                        <select 
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="kitchen-select-primary appearance-none pr-10" 
+                            style={{ minWidth: '160px' }}
+                        >
+                            <option value="All">All Status</option>
+                            <option value="Low Stock">Low Stock</option>
+                            <option value="Good">Good Stock</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-[#3C2A21]">
+                            <Filter size={18} />
                         </div>
-                    </td>
-                    </tr>
-                ))}
-                </tbody>
-            </table>
-            </div>
-        )}
-      </div>
+                    </div>
 
-      <IngredientModal isOpen={isIngredientModalOpen} onClose={handleCloseModals} onSave={handleSaveIngredient} ingredientToEdit={selectedIngredient} />
-      <AdjustStockModal isOpen={isAdjustModalOpen} onClose={handleCloseModals} onAdjust={handleAdjustStock} ingredient={selectedIngredient} />
+                    {/* Sort Dropdown (White) */}
+                    <div className="relative">
+                        <select 
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="kitchen-select"
+                        >
+                            <option value="name">Name (A-Z)</option>
+                            <option value="stock-low">Stock (Lowest First)</option>
+                            <option value="stock-high">Stock (Highest First)</option>
+                        </select>
+                    </div>
+
+                    {/* Add Button */}
+                    <button 
+                        onClick={handleOpenAddModal} 
+                        className="kitchen-btn btn-accent flex items-center gap-2"
+                    >
+                        <Plus size={20} /> Add Ingredient
+                    </button>
+                </div>
+            </div>
+
+            {/* 2. TABLE CONTAINER */}
+            {loading ? (
+                    <div className="text-center text-white text-xl py-10">Loading inventory...</div>
+            ) : error ? (
+                    <div className="text-center text-red-500 text-xl py-10">Error: {error}</div>
+            ) : (
+                    <div className="kitchen-table-container">
+                    <table className="kitchen-table">
+                        <thead>
+                        <tr>
+                            <th>Ingredient Name</th>
+                            <th>Status</th>
+                            <th className="text-center">Current Stock</th>
+                            <th>Unit</th>
+                            <th className="text-center">Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {filteredList.map((item) => {
+                            const current = parseFloat(item.stock_level);
+                            const threshold = parseFloat(item.reorder_point || 10);
+                            const isLow = current <= threshold;
+
+                            return (
+                                <tr key={item.ingredient_id}>
+                                <td className="font-bold">{item.name}</td>
+                                
+                                {/* Status Badge */}
+                                <td>
+                                    <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase border ${isLow ? 'bg-red-100 text-red-700 border-red-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
+                                        {isLow ? <AlertTriangle size={14}/> : <CheckCircle size={14}/>}
+                                        {isLow ? 'Low Stock' : 'Good'}
+                                    </div>
+                                </td>
+
+                                <td className={`text-center font-bold text-lg ${isLow ? 'text-red-600' : 'text-gray-700'}`}>
+                                    {current.toFixed(2)}
+                                </td>
+                                <td className="text-sm text-gray-500">{item.unit_of_measurement}</td>
+                                <td className="text-center">
+                                    <div className="flex justify-center gap-3">
+                                        <button onClick={() => handleOpenAdjustModal(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Adjust Stock">
+                                            <Sliders size={18} />
+                                        </button>
+                                        <button onClick={() => handleOpenEditModal(item)} className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors" title="Edit Details">
+                                            <Edit2 size={18} />
+                                        </button>
+                                    </div>
+                                </td>
+                                </tr>
+                            );
+                        })}
+                        {filteredList.length === 0 && (
+                            <tr><td colSpan="5" className="text-center p-8 text-gray-500">No ingredients found matching filters.</td></tr>
+                        )}
+                        </tbody>
+                    </table>
+                    </div>
+            )}
+
+            {/* Modals */}
+            <IngredientModal isOpen={isIngredientModalOpen} onClose={handleCloseModals} onSave={handleSaveIngredient} ingredientToEdit={selectedIngredient} />
+            <AdjustStockModal isOpen={isAdjustModalOpen} onClose={handleCloseModals} onAdjust={handleAdjustStock} ingredient={selectedIngredient} />
+        </div>
+      </div>
     </>
   );
 };
