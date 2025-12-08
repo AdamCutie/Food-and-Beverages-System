@@ -22,18 +22,17 @@ const emitOrderUpdate = (req, eventName, data) => {
 // @access  Private (Staff)
 export const createPosOrder = async (req, res) => {
     const connection = await pool.getConnection();
-    // Move order_id declaration here so it's available in catch block if needed (optional)
     let order_id; 
 
     try {
         await connection.beginTransaction();
 
-        // --- 1. GET NEW FIELDS FROM req.body ---
-        // UPDATED: Added client_id and table_id to destructuring
+        // 1. Destructure the new 'customer_name' field
         const { 
           items, order_type, instructions, delivery_location, 
           payment_method, change_amount,
-          client_id, table_id 
+          client_id, table_id, 
+          customer_name // <--- NEW FIELD FROM FRONTEND
         } = req.body;
 
         const [empRows] = await connection.query("SELECT employee_id FROM employees WHERE user_id = ?", [req.user.id]);
@@ -47,20 +46,28 @@ export const createPosOrder = async (req, res) => {
         await validateStock(items, connection);
 
         // Step 2: Create the order
-        // We set totals to 0 initially, they are updated in Step 3
-        const orderSql = "INSERT INTO fb_orders (client_id, employee_id, order_type, delivery_location, table_id, status, items_total, service_charge_amount, vat_amount, total_amount) VALUES (?, ?, ?, ?, ?, 'pending', 0, 0, 0, 0)";
+        // UPDATED SQL: Added 'guest_name' column
+        const orderSql = `
+            INSERT INTO fb_orders 
+            (client_id, guest_name, employee_id, order_type, delivery_location, table_id, status, items_total, service_charge_amount, vat_amount, total_amount) 
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, 0, 0, 0)
+        `;
         
-        // UPDATED: Use client_id || null, fixed delivery_location variable name
+        // Logic: If client_id is present, use it (App User). If not, use customer_name as guest_name (Walk-in).
+        const finalClientId = client_id || null;
+        const finalGuestName = !client_id && customer_name ? customer_name : null;
+
         const [orderResult] = await connection.query(orderSql, [
-            client_id || null, 
+            finalClientId,
+            finalGuestName, // <--- Insert Name "Nicole" here
             employee_id, 
             order_type, 
-            delivery_location, 
+            delivery_location, // <--- Insert Location "Counter (Take-out)" here
             table_id || null
         ]); 
-        order_id = orderResult.insertId; // Assign to the outer variable
+        order_id = orderResult.insertId;
 
-        // --- NEW LOGIC: Set Table to Occupied ---
+        // --- Set Table to Occupied (if applicable) ---
         if (table_id) {
             await connection.query(
                 "UPDATE fb_tables SET status = 'Occupied' WHERE table_id = ?", 
@@ -68,34 +75,27 @@ export const createPosOrder = async (req, res) => {
             );
         }
         
-        // Step 3: Calculate totals and create order details
+        // Step 3: Calculate totals (Logic remains the same)
         let calculatedItemsTotal = 0; 
 
         for (const item of items) {
-            // 1. Fetch the item's price AND promo details
+            // ... (Price fetching & Promo logic remains same) ...
             const [rows] = await connection.query(
-                `SELECT 
-                    mi.price, 
-                    p.discount_percentage, 
-                    p.start_date, 
-                    p.end_date, 
-                    p.is_active 
+                `SELECT mi.price, p.discount_percentage, p.start_date, p.end_date, p.is_active 
                  FROM fb_menu_items mi
                  LEFT JOIN fb_promotions p ON mi.promotion_id = p.promotion_id
                  WHERE mi.item_id = ?`, 
                 [item.item_id]
             );
 
-            if (rows.length === 0) continue; // Skip if item not found
+            if (rows.length === 0) continue;
 
             const dbItem = rows[0];
-            let actualPrice = parseFloat(dbItem.price); // Start with the original price
+            let actualPrice = parseFloat(dbItem.price);
 
-            // 2. Check if the promo is active and valid
             if (dbItem.discount_percentage && dbItem.is_active) {
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                
                 const startDate = new Date(dbItem.start_date);
                 const endDate = new Date(dbItem.end_date);
                 
@@ -105,23 +105,18 @@ export const createPosOrder = async (req, res) => {
                 }
             }
             
-            // 3. Use the new 'actualPrice' for all calculations
             const subtotal = actualPrice * item.quantity;
             calculatedItemsTotal += subtotal;
-   
             const itemInstructions = item.instructions || instructions || '';
             
-            // UPDATED: Insert 'actualPrice' into 'price_on_purchase'
             const detailSql = "INSERT INTO fb_order_details (order_id, item_id, quantity, price_on_purchase, subtotal, instructions) VALUES (?, ?, ?, ?, ?, ?)";
             await connection.query(detailSql, [order_id, item.item_id, item.quantity, actualPrice, subtotal, itemInstructions]);
         }
 
-        // Calculate service charge and VAT
         const calculatedServiceCharge = calculatedItemsTotal * SERVICE_RATE;
         const calculatedVatAmount = (calculatedItemsTotal + calculatedServiceCharge) * VAT_RATE; 
         const calculatedTotalAmount = calculatedItemsTotal + calculatedServiceCharge + calculatedVatAmount;
 
-        // Step 3.1: Update order with calculated totals
         await connection.query(
             `UPDATE fb_orders 
              SET items_total = ?, service_charge_amount = ?, vat_amount = ?, total_amount = ? 
@@ -129,36 +124,38 @@ export const createPosOrder = async (req, res) => {
             [calculatedItemsTotal, calculatedServiceCharge, calculatedVatAmount, calculatedTotalAmount, order_id]
         );
         
-        // Step 4: Deduct stock
         await adjustStock(items, 'deduct', connection);
-        
-        // Step 5: Log the stock deduction
         await logOrderStockChange(order_id, items, 'ORDER_DEDUCT', connection);
 
-        // Step 6: Record payment
         if (payment_method !== 'Pay Later') {
-            const paymentSql =
-                "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
-            await connection.query(paymentSql, [
-                order_id,
-                payment_method || "Cash",
-                calculatedTotalAmount,
-                change_amount || 0
-            ]);
-        } else {
-             // Optional: Log that this is a Pay Later order
-             console.log(`Order ${order_id} created as Pay Later (Unpaid)`);
+            const paymentSql = "INSERT INTO fb_payments (order_id, payment_method, amount, change_amount, payment_status) VALUES (?, ?, ?, ?, 'paid')";
+            await connection.query(paymentSql, [order_id, payment_method || "Cash", calculatedTotalAmount, change_amount || 0]);
         }
 
         await connection.commit();
 
-         // ✅ NEW: Emit real-time notification
+        // Emit Socket Event with Correct Name
+        // If it's a guest, send guest_name. If client, fetch their name.
+        let firstName = finalGuestName;
+        let lastName = '';
+        
+        if (finalClientId) {
+             const [clientInfo] = await connection.query("SELECT first_name, last_name FROM tbl_client_users WHERE client_id = ?", [finalClientId]);
+             if (clientInfo.length > 0) {
+                 firstName = clientInfo[0].first_name;
+                 lastName = clientInfo[0].last_name;
+             }
+        }
+
         emitOrderUpdate(req, 'new-order', {
             order_id,
             order_type,
             table_id,
+            delivery_location,
             total_amount: calculatedTotalAmount,
             status: 'pending',
+            first_name: firstName, // Sent to KOD
+            last_name: lastName,
             timestamp: new Date()
         });
 
@@ -543,22 +540,31 @@ export const updateOrderStatus = async (req, res) => {
     }
 };
 
-// @desc    Get kitchen orders (pending, preparing, ready)
+// @desc    Get active kitchen orders (pending/preparing/ready)
 // @route   GET /api/orders/kitchen
 // @access  Private (Staff)
 export const getKitchenOrders = async (req, res) => {
     try {
+        // UPDATED QUERY: Uses COALESCE to fallback to 'guest_name' if 'client_id' is null
         const sql = `
-            SELECT o.*, c.first_name, c.last_name
+            SELECT 
+                o.order_id, 
+                o.order_date, 
+                o.order_type, 
+                o.delivery_location, 
+                o.status, 
+                o.total_amount,
+                -- The Magic: Use User Name if exists, otherwise Guest Name
+                COALESCE(c.first_name, o.guest_name) AS first_name,
+                COALESCE(c.last_name, '') AS last_name
             FROM fb_orders o
             LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
             WHERE o.status IN ('pending', 'preparing', 'ready')
             ORDER BY o.order_date ASC
         `;
-
+        
         const [orders] = await pool.query(sql);
         res.json(orders);
-
     } catch (error) {
         console.error("Error fetching kitchen orders:", error);
         res.status(500).json({ message: "Error fetching kitchen orders", error: error.message });
@@ -570,9 +576,12 @@ export const getKitchenOrders = async (req, res) => {
 // @access  Private (Staff)
 export const getServedOrders = async (req, res) => {
     try {
-        // UPDATED: Now fetches 'cancelled' orders as well
         const sql = `
-            SELECT o.*, c.first_name, c.last_name
+            SELECT 
+                o.*, 
+                -- Same Magic Fix for Archive
+                COALESCE(c.first_name, o.guest_name) AS first_name,
+                COALESCE(c.last_name, '') AS last_name
             FROM fb_orders o
             LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
             WHERE o.status IN ('served', 'cancelled')
