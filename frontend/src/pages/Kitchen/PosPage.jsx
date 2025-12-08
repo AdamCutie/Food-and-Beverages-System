@@ -206,11 +206,13 @@ function PosPage() {
   const finalItems = getProcessedItems();
 
   return (
-    <div className="flex flex-col h-screen" style={{ backgroundColor: '#523a2eff' }}>
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#523a2e]">
+      <div className="flex-none">
       <InternalNavBar />
-      <div className="flex flex-1 overflow-hidden">
+      </div>
+      <div className="flex flex-1 overflow-hidden relative">
         
-        <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-6 pos-main-content">
           <div className="relative w-full max-w-lg mx-auto mb-6">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="text-gray-400" size={20} />
@@ -242,7 +244,7 @@ function PosPage() {
           />
         </main>
 
-        <aside className="w-96 border-l border-gray-200 overflow-y-auto h-full">
+        <aside className="w-[400px] flex-none pos-cart-sidebar z-20 shadow-2xl">
           <PosCart
             cartItems={cartItems}
             availableTables={tables}

@@ -7,12 +7,11 @@ const getImageUrl = (imagePath) => {
 
   // If it's already a full URL (like cloudinary), return it
   if (imagePath.startsWith('http')) {
-     return imagePath.replace('http://localhost:21917', 'https://food-and-beverages-system.onrender.com');
+     // Optional: Replace localhost with Render URL for production if needed
+     // return imagePath.replace('http://localhost:21917', 'https://food-and-beverages-system.onrender.com');
+     return imagePath;
   }
 
-  // Otherwise, append the correct base URL
-  // If we are in development (localhost), use localhost.
-  // If we are in production (Render), use the Render URL.
   const BASE_URL = window.location.hostname === 'localhost' 
       ? 'http://localhost:21917' 
       : 'https://food-and-beverages-system.onrender.com';
@@ -47,7 +46,11 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle, theme = "cust
   };
 
   return (
-    <div className={`menu-grid-layout ${theme === 'customer' ? 'customer-theme' : ''}`} style={layoutStyle}>
+    // ✅ FIX: Added logic to apply 'kitchen-theme' class if theme prop is 'kitchen'
+    <div 
+        className={`menu-grid-layout ${theme === 'customer' ? 'customer-theme' : 'kitchen-theme'}`} 
+        style={layoutStyle}
+    >
       {items.map((item) => {
         
         const { isActive, displayPrice, originalPrice, discountPercent } = getPromoPrice(item);
@@ -60,7 +63,6 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle, theme = "cust
         return (
           <div key={item.item_id} className={`food-card ${!item.is_available ? 'unavailable' : ''}`}>
             <div className="card-image-container">
-              {/* ✅ UPDATED IMAGE TAG */}
               <img
                 src={getImageUrl(item.image_url)}
                 alt={item.item_name}

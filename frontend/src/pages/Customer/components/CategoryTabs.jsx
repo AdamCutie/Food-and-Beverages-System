@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import '../CustomerTheme.css';
+import '../CustomerTheme.css'; 
 
-const CategoryTabs = ({ categories, selectedCategory, onSelectCategory, onSortChange }) => {
+// ✅ FIX: Destructure 'theme' prop
+const CategoryTabs = ({ categories, selectedCategory, onSelectCategory, onSortChange, theme = "customer" }) => {
   const [showFilter, setShowFilter] = useState(false);
   const [currentSort, setCurrentSort] = useState('a-z'); 
-  const [dropdownStyle, setDropdownStyle] = useState({}); // Stores the calculated position
+  const [dropdownStyle, setDropdownStyle] = useState({});
   
-  const filterButtonRef = useRef(null); // Reference to find the button on screen
+  const filterButtonRef = useRef(null);
 
   const sortOptions = [
     { id: 'a-z', label: 'Alphabetical (A-Z)' },
@@ -16,19 +17,15 @@ const CategoryTabs = ({ categories, selectedCategory, onSelectCategory, onSortCh
     { id: 'recent', label: 'Recently Added' },
   ];
 
-  // Logic to toggle and calculate position
   const toggleFilter = () => {
     if (!showFilter) {
-      // If opening, calculate where the button is right now
       const rect = filterButtonRef.current.getBoundingClientRect();
-      
-      // Set dropdown position relative to the window (Fixed position)
       setDropdownStyle({
         position: 'fixed',
-        top: `${rect.bottom + 5}px`, // 5px below the button
-        left: `${rect.right - 200}px`, // Align right edge (assuming width 200px)
+        top: `${rect.bottom + 5}px`, 
+        left: `${rect.right - 200}px`,
         width: '200px',
-        zIndex: 9999, // Ensure it is on top of everything
+        zIndex: 9999,
       });
     }
     setShowFilter(!showFilter);
@@ -42,7 +39,6 @@ const CategoryTabs = ({ categories, selectedCategory, onSelectCategory, onSortCh
     }
   };
 
-  // Close dropdown if user clicks outside (Standard UI behavior)
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -63,11 +59,11 @@ const CategoryTabs = ({ categories, selectedCategory, onSelectCategory, onSortCh
   }, [showFilter]);
 
   return (
-    <div className="category-tabs-wrapper">
+    // ✅ FIX: Apply 'kitchen-theme' class if theme prop is 'kitchen'
+    <div className={`category-tabs-wrapper ${theme === 'kitchen' ? 'kitchen-theme' : 'customer-theme'}`}>
       <div className="category-tabs-track">
         <div className="category-tabs-list">
           
-          {/* Categories */}
           <button
             onClick={() => onSelectCategory(0)}
             className={`category-tab-btn ${selectedCategory === 0 ? 'active' : ''}`}
@@ -85,7 +81,6 @@ const CategoryTabs = ({ categories, selectedCategory, onSelectCategory, onSortCh
             </button>
           ))}
 
-          {/* Filter Button */}
           <div className="filter-wrapper">
             <button 
               ref={filterButtonRef}
@@ -104,10 +99,6 @@ const CategoryTabs = ({ categories, selectedCategory, onSelectCategory, onSortCh
             </button>
           </div>
 
-          {/* 
-             Render Dropdown OUTSIDE the scroll container visually
-             by using fixed positioning logic we calculated above.
-          */}
           {showFilter && (
             <div 
               className="filter-dropdown-menu" 

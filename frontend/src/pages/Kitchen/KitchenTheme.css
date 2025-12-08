@@ -211,3 +211,74 @@
   align-items: center;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+
+/* Add this to KitchenTheme.css to style the Food Grid Cards */
+.kitchen-theme .food-card {
+  background-color: white; /* Force white background for cards */
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  color: #3C2A21; /* Dark text */
+}
+
+.kitchen-theme .item-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #3C2A21;
+}
+
+.kitchen-theme .item-description {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.kitchen-theme .btn-add-cart {
+    background-color: #F9A825;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+}
+
+/* --- Kitchen Theme Overrides for Components --- */
+
+/* Category Tabs Override */
+.kitchen-theme .category-tab-btn {
+  /* Default State */
+  background-color: white; 
+  color: var(--kitchen-text-primary);
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.kitchen-theme .category-tab-btn:hover {
+  background-color: #fff8e1; /* Light orange tint on hover */
+  border-color: var(--kitchen-accent);
+}
+
+.kitchen-theme .category-tab-btn.active {
+  /* Active State (Selected) */
+  background-color: var(--kitchen-accent); /* Orange #F9A825 */
+  color: #fff; /* White text */
+  border-color: var(--kitchen-accent);
+  box-shadow: 0 2px 4px rgba(249, 168, 37, 0.3);
+}
+
+/* Filter Dropdown Override */
+.kitchen-theme .filter-dropdown-menu {
+  background-color: white;
+  border: 1px solid var(--kitchen-border);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.kitchen-theme .filter-option:hover {
+  background-color: #fff8e1;
+  color: var(--kitchen-text-primary);
+}
+
+.kitchen-theme .filter-option.selected {
+  background-color: var(--kitchen-accent);
+  color: white;
+}
