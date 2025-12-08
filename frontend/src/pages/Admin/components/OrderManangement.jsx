@@ -1,118 +1,172 @@
 import React, { useState } from "react";
-import * as XLSX from "xlsx"; // ✅ Import for Excel
-import { Download, Calendar } from "lucide-react"; // ✅ Icons
-import toast from "react-hot-toast"; // ✅ For notifications
+import * as XLSX from "xlsx"; 
+import { Download, Calendar } from "lucide-react"; 
+import toast from "react-hot-toast"; 
 import '../AdminTheme.css';
 
 const OrderManagement = ({ orders }) => {
-  // 1. Add State for Filters
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // --- DATE HELPERS (Local Time) ---
+  const getTodayStr = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+  
+  const getStartOfWeek = (date) => {
+    const d = new Date(date);
+    const day = d.getDay(); // 0 (Sun) - 6 (Sat)
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+    return new Date(d.setDate(diff)).toLocaleDateString('en-CA');
+  };
 
-  // 2. LOGIC: Filter orders by Date Range
+  const getStartOfMonth = (date) => {
+    const d = new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-CA');
+  };
+
+  // --- TIMEZONE FIXER ---
+  const fixDate = (dateInput) => {
+      if (!dateInput) return new Date();
+      const dateStr = typeof dateInput === 'string' ? dateInput : new Date(dateInput).toISOString();
+      if (dateStr.includes(' ') && !dateStr.includes('T')) return new Date(dateStr.replace(' ', 'T') + 'Z');
+      if (dateStr.includes('T') && !dateStr.endsWith('Z') && !dateStr.includes('+')) return new Date(dateStr + 'Z');
+      return new Date(dateStr);
+  };
+
+  const getLocalDatePart = (dateObj) => {
+      return new Date(dateObj).toLocaleDateString('en-CA');
+  };
+
+  // --- STATE ---
+  const [quickFilter, setQuickFilter] = useState('Today');
+  const [startDate, setStartDate] = useState(getTodayStr());
+  const [endDate, setEndDate] = useState(getTodayStr());
+
+  // --- HANDLER: Quick Filter Change ---
+  const handleQuickFilterChange = (e) => {
+    const filter = e.target.value;
+    setQuickFilter(filter);
+
+    const today = new Date();
+    const endStr = getTodayStr();
+    let startStr = endStr;
+
+    if (filter === 'Today') {
+        startStr = endStr;
+    } else if (filter === 'Yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        startStr = yesterday.toLocaleDateString('en-CA');
+        setStartDate(startStr);
+        setEndDate(startStr);
+        return;
+    } else if (filter === 'This Week') {
+        startStr = getStartOfWeek(today);
+    } else if (filter === 'This Month') {
+        startStr = getStartOfMonth(today);
+    } else if (filter === 'Custom') {
+        return; // Don't reset dates
+    }
+
+    if (filter !== 'Custom') {
+        setStartDate(startStr);
+        setEndDate(endStr);
+    }
+  };
+
+  // --- LOGIC: Filter orders by Date Range ---
   const filteredOrders = orders.filter((order) => {
-    // Show all if no dates selected
-    if (!startDate && !endDate) return true; 
+    if (!startDate && !endDate) return true;
 
-    // Parse order date (Support 'order_date' or 'created_at')
-    const orderDate = new Date(order.order_date || order.created_at).getTime();
-    
-    // Set start time to 00:00:00 and end time to 23:59:59
-    const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
-    const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
+    const orderDateObj = fixDate(order.order_date || order.created_at);
+    const orderDateStr = getLocalDatePart(orderDateObj);
 
-    if (start && end) return orderDate >= start && orderDate <= end;
-    if (start) return orderDate >= start;
-    if (end) return orderDate <= end;
-    return true;
+    return orderDateStr >= startDate && orderDateStr <= endDate;
   });
 
-  // 3. LOGIC: Export Filtered Orders to Excel
+  // --- LOGIC: Export Filtered Orders ---
   const handleExportOrders = () => {
     if (filteredOrders.length === 0) {
       toast.error("No orders to export.");
       return;
     }
 
-    // A. Format data for Excel
     const dataToExport = filteredOrders.map(order => ({
       'Order ID': order.order_id,
       'Customer Name': (order.first_name || order.last_name) ? `${order.first_name} ${order.last_name}` : 'Guest',
       'Order Type': order.order_type,
       'Location': order.delivery_location,
-      'Date': new Date(order.order_date).toLocaleString(),
+      'Date': fixDate(order.order_date).toLocaleString(),
       'Status': order.status,
-      'Total Amount': Number(order.total_amount || 0) // Ensure number for auto-sum
+      'Total Amount': Number(order.total_amount || 0)
     }));
 
-    // B. Create Sheet
     const worksheet = XLSX.utils.json_to_sheet(dataToExport, { origin: "A4" });
 
-    // C. Add Header (Title & Date)
     const title = [{ v: "ORDER MANAGEMENT REPORT", t: "s" }];
-    let rangeText = "All Orders";
-    if (startDate || endDate) {
-       rangeText = `Filter: ${startDate || 'Start'} to ${endDate || 'Now'}`;
-    }
+    const rangeText = `Filter: ${quickFilter} (${startDate} to ${endDate})`;
     const dateInfo = [{ v: `Generated: ${new Date().toLocaleString()} | ${rangeText}`, t: "s" }];
     
     XLSX.utils.sheet_add_aoa(worksheet, [title, dateInfo], { origin: "A1" });
 
-    // D. Add Totals Row
     const totalRevenue = dataToExport.reduce((acc, curr) => acc + curr['Total Amount'], 0);
-    const totalRow = {
-      'Order ID': "TOTALS:",
-      'Total Amount': totalRevenue
-    };
+    const totalRow = { 'Order ID': "TOTALS:", 'Total Amount': totalRevenue };
     XLSX.utils.sheet_add_json(worksheet, [totalRow], { origin: -1, skipHeader: true });
 
-    // E. Download
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
-    XLSX.writeFile(workbook, `Order_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(workbook, `Order_Report_${getTodayStr()}.xlsx`);
     toast.success("Order report downloaded!");
   };
 
   return (
     <div className="admin-section-container">
-              <h2 className="admin-page-title p-6">Order Management</h2>
+      <h2 className="admin-page-title p-6">Order Management</h2>
+      
       <div className="admin-table-container">
 
-        {/* --- 4. FILTER & EXPORT CONTROLS --- */}
-        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-[#fff2e0] p-4 mx-6 rounded-lg border border-[#D1C0B6]">
+        {/* --- FILTER & EXPORT CONTROLS --- */}
+        <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 bg-[#fff2e0] p-4 mx-6 rounded-lg border border-[#D1C0B6]">
           
-          {/* Date Filters */}
+          {/* Date Filter Group */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded border border-[#D1C0B6]">
-              <Calendar size={18} className="text-[#3C2A21]" />
-              <span className="text-sm font-bold text-[#3C2A21]">From:</span>
-              <input 
-                type="date" 
-                value={startDate} 
-                onChange={(e) => setStartDate(e.target.value)}
-                className="outline-none text-[#3C2A21] bg-transparent cursor-pointer text-sm"
-              />
-            </div>
-            
-            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded border border-[#D1C0B6]">
-              <span className="text-sm font-bold text-[#3C2A21]">To:</span>
-              <input 
-                type="date" 
-                value={endDate} 
-                onChange={(e) => setEndDate(e.target.value)}
-                className="outline-none text-[#3C2A21] bg-transparent cursor-pointer text-sm"
-              />
+            <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-[#3C2A21]" />
+                <span className="text-sm font-bold text-[#3C2A21]">Period:</span>
+                
+                {/* Dropdown */}
+                <select 
+                    value={quickFilter} 
+                    onChange={handleQuickFilterChange} 
+                    className="p-2 rounded border border-[#D1C0B6] text-[#3C2A21] h-[40px] bg-white cursor-pointer focus:outline-none focus:border-[#F9A825]"
+                    style={{ minWidth: '130px' }}
+                >
+                    <option value="Today">Today</option>
+                    <option value="Yesterday">Yesterday</option>
+                    <option value="This Week">This Week</option>
+                    <option value="This Month">This Month</option>
+                    <option value="Custom">Custom</option>
+                </select>
             </div>
 
-            {/* Clear Button */}
-            {(startDate || endDate) && (
-              <button 
-                onClick={() => { setStartDate(""); setEndDate(""); }}
-                className="text-sm text-red-500 hover:text-red-700 underline font-medium ml-2"
-              >
-                Clear
-              </button>
+            {/* Conditional Inputs for Custom Range ONLY */}
+            {quickFilter === 'Custom' && (
+                <div className="flex items-center gap-2 animate-fadeIn ml-2">
+                    <input 
+                        type="date" 
+                        value={startDate} 
+                        onChange={(e) => setStartDate(e.target.value)}
+                        max={endDate}
+                        className="p-2 rounded border border-[#D1C0B6] text-[#3C2A21] bg-white text-sm h-[40px]"
+                    />
+                    <span className="text-gray-500 font-bold">-</span>
+                    <input 
+                        type="date" 
+                        value={endDate} 
+                        onChange={(e) => setEndDate(e.target.value)}
+                        min={startDate}
+                        className="p-2 rounded border border-[#D1C0B6] text-[#3C2A21] bg-white text-sm h-[40px]"
+                    />
+                </div>
             )}
+            
+            {/* REMOVED: The text span that showed the date range is gone. */}
           </div>
 
           {/* Export Button */}
@@ -126,7 +180,7 @@ const OrderManagement = ({ orders }) => {
           </button>
         </div>
 
-        {/* --- 5. TABLE (Updated to use filteredOrders) --- */}
+        {/* --- TABLE --- */}
         <table className="admin-table">
           <thead>
             <tr>
@@ -155,22 +209,23 @@ const OrderManagement = ({ orders }) => {
                   <td className="text-center">
                     <span
                       className={`status-badge ${
-                        order.status === 'Pending' ? 'bg-yellow-200 text-yellow-800' :
-                        order.status === 'Completed' ? 'bg-green-200 text-green-800' :
-                        order.status === 'Cancelled' ? 'bg-red-200 text-red-800' :
+                        order.status === 'pending' ? 'bg-yellow-200 text-yellow-800' :
+                        order.status === 'served' ? 'bg-green-200 text-green-800' :
+                        order.status === 'cancelled' ? 'bg-red-200 text-red-800' :
                         'bg-gray-200 text-gray-800'
                       }`}
                     >
                       {order.status}
                     </span>
                   </td>
-                  <td>{new Date(order.order_date).toLocaleString()}</td>
+                  <td>{fixDate(order.order_date).toLocaleString()}</td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td colSpan="7" className="text-center p-8 text-gray-500">
-                  No orders found for the selected date range.
+                  <p className="text-lg">No orders found.</p>
+                  <p className="text-sm">Filter: {quickFilter} ({startDate} - {endDate})</p>
                 </td>
               </tr>
             )}
