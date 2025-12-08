@@ -3,7 +3,7 @@ import { Trash2, ShoppingCart, User, CreditCard, ShoppingBag, Utensils } from 'l
 
 const PosCart = ({
   cartItems = [],
-  availableTables = [], // ✅ NEW: List of available tables from parent
+  availableTables = [], // This should now contain ALL tables (Occupied & Available)
   onUpdateQuantity,
   onPlaceOrder,
   instructions,
@@ -12,8 +12,8 @@ const PosCart = ({
 }) => {
   // Local State
   const [customerName, setCustomerName] = useState('');
-  const [serviceMode, setServiceMode] = useState('Take Out'); // Default
-  const [selectedTableId, setSelectedTableId] = useState(''); // Store ID
+  const [serviceMode, setServiceMode] = useState('Take Out'); 
+  const [selectedTableId, setSelectedTableId] = useState(''); 
 
   // Calculations
   const SERVICE_RATE = 0.10; 
@@ -95,24 +95,33 @@ const PosCart = ({
            </div>
         </div>
 
-        {/* CONDITIONAL: Table Dropdown (Only if For Here) */}
+        {/* ✅ UPDATED: Table Dropdown with Status Logic */}
         {serviceMode === 'For Here' && (
             <div className="animate-fadeIn">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Select Table</label>
                 <select 
                     value={selectedTableId}
                     onChange={(e) => setSelectedTableId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#F9A825] bg-white"
+                    className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-[#F9A825] bg-white cursor-pointer"
                 >
                     <option value="">-- Choose a Table --</option>
                     {availableTables.length > 0 ? (
-                        availableTables.map(t => (
-                            <option key={t.table_id} value={t.table_id}>
-                                Table {t.table_number} (Cap: {t.capacity})
-                            </option>
-                        ))
+                        availableTables.map(t => {
+                            // Check status case-insensitively
+                            const isOccupied = t.status?.toLowerCase() === 'occupied';
+                            return (
+                                <option 
+                                    key={t.table_id} 
+                                    value={t.table_id} 
+                                    disabled={isOccupied} // 🔒 Disable if occupied
+                                    className={isOccupied ? "text-red-400 bg-gray-100" : "text-gray-800"} // Visual cue
+                                >
+                                    Table {t.table_number} {isOccupied ? '(Occupied)' : `(Cap: ${t.capacity})`}
+                                </option>
+                            );
+                        })
                     ) : (
-                        <option disabled>No tables available</option>
+                        <option disabled>No tables loaded</option>
                     )}
                 </select>
             </div>
