@@ -341,6 +341,7 @@ export const createOrder = async (req, res) => {
         connection.release();
     }
 };
+
 // @desc    Get all orders
 // @route   GET /api/orders
 // @access  Private
@@ -349,8 +350,8 @@ export const getOrders = async (req, res) => {
         const sql = `
             SELECT 
                 o.*,
-                c.first_name,
-                c.last_name
+                COALESCE(c.first_name, o.guest_name) AS first_name,
+                COALESCE(c.last_name, '') AS last_name
             FROM fb_orders o
             LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
             ORDER BY o.order_date DESC
@@ -370,11 +371,12 @@ export const getOrderById = async (req, res) => {
     try {
         const { id } = req.params;
 
+        // ✅ FIX: Added COALESCE to check guest_name if client_id is null
         const [orders] = await pool.query(
             `SELECT 
                 o.*, 
-                c.first_name, 
-                c.last_name
+                COALESCE(c.first_name, o.guest_name) AS first_name,
+                COALESCE(c.last_name, '') AS last_name
             FROM fb_orders o
             LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
             WHERE o.order_id = ?`,
@@ -387,14 +389,12 @@ export const getOrderById = async (req, res) => {
         
         const order = orders[0];
 
-        // BUG FIX #5: Remove detail_id alias that doesn't match frontend expectations
-        // WHY: Frontend might expect order_detail_id consistently
-        // HOW: Use the actual column name without alias for clarity
+        // Fetch Items (No changes needed here)
         const [items] = await pool.query(
             `SELECT 
                 mi.item_name, 
                 od.quantity, 
-                od.price_on_purchase AS price, -- UPDATED: Fetch the frozen price from purchase time
+                od.price_on_purchase AS price,
                 od.subtotal,
                 od.instructions,
                 od.order_detail_id
@@ -412,7 +412,7 @@ export const getOrderById = async (req, res) => {
             order_date: order.order_date,
             order_type: order.order_type,
             delivery_location: order.delivery_location,
-            first_name: order.first_name,
+            first_name: order.first_name, // Now contains "Bentong"
             last_name: order.last_name,
             items_total: order.items_total,
             service_charge_amount: order.service_charge_amount,
