@@ -138,7 +138,6 @@ export const createPosOrder = async (req, res) => {
         // If it's a guest, send guest_name. If client, fetch their name.
         let firstName = finalGuestName;
         let lastName = '';
-        
         if (finalClientId) {
              const [clientInfo] = await connection.query("SELECT first_name, last_name FROM tbl_client_users WHERE client_id = ?", [finalClientId]);
              if (clientInfo.length > 0) {
@@ -154,15 +153,33 @@ export const createPosOrder = async (req, res) => {
             delivery_location,
             total_amount: calculatedTotalAmount,
             status: 'pending',
-            first_name: firstName, // Sent to KOD
+            first_name: firstName,
             last_name: lastName,
             timestamp: new Date()
         });
 
+        // ✅ UPDATE RESPONSE: Return full financial details for the Receipt
         res.status(201).json({
-            order_id,
-            total_amount: calculatedTotalAmount,
-            message: "POS order created successfully"
+            success: true,
+            message: "POS order created successfully",
+            order: {
+                order_id,
+                order_date: new Date(),
+                order_type,
+                customer_name: finalGuestName || (firstName + ' ' + lastName).trim() || 'Guest',
+                delivery_location,
+                // Financials
+                items_total: calculatedItemsTotal,      // Subtotal
+                service_charge: calculatedServiceCharge,
+                vat_amount: calculatedVatAmount,
+                total_amount: calculatedTotalAmount,
+                // Payment Info
+                payment_method: payment_method || "Cash",
+                amount_tendered: req.body.amount_tendered || 0,
+                change_amount: change_amount || 0,
+                // Items List (Passed back for convenience)
+                items: items // We assume frontend still has the full item details, but sending back is safe
+            }
         });
 
     } catch (error) {
