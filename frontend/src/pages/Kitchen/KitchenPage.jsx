@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom'; // 1. Import Navigation
+import { useNavigate } from 'react-router-dom'; 
 import toast from 'react-hot-toast';
-import { Trash2, Clock, Package, CheckCircle, CheckCircle2 } from 'lucide-react';
+import { Trash2, Clock, Package, CheckCircle, CheckCircle2, Calendar } from 'lucide-react';
 import InternalNavBar from './components/InternalNavBar';
 import apiClient from '../../utils/apiClient';
 import './KitchenTheme.css'; 
@@ -18,15 +18,12 @@ function KitchenPage() {
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterType, setFilterType] = useState('All Types');
   
-  // DATE FILTER
-  const getTodayStr = () => new Date().toISOString().split('T')[0];
-  const getYesterdayStr = () => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  };
+  // --- DATE FILTER STATE ---
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(todayStr);
+  const [endDate, setEndDate] = useState(todayStr);
+  const [quickFilter, setQuickFilter] = useState('Today'); 
 
-  const [filterDate, setFilterDate] = useState(getTodayStr());
   const [servedCount, setServedCount] = useState(0);
 
   const { socket } = useSocket();
@@ -157,13 +154,51 @@ function KitchenPage() {
     }
   };
 
+  // --- DATE FILTER HANDLER ---
+  const handleQuickFilterChange = (e) => {
+    const filter = e.target.value;
+    setQuickFilter(filter);
+
+    const today = new Date();
+    const endStr = today.toISOString().split('T')[0];
+    let startStr = endStr;
+
+    if (filter === 'Today') {
+        startStr = endStr;
+    } else if (filter === 'Yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        startStr = yesterday.toISOString().split('T')[0];
+        setEndDate(startStr); // Ensure end date is also yesterday
+    } else if (filter === 'This Week') {
+        // Calculate Monday of current week
+        const day = today.getDay(); 
+        const diff = today.getDate() - (day === 0 ? 6 : day - 1);
+        const monday = new Date(today.setDate(diff));
+        startStr = monday.toISOString().split('T')[0];
+        setEndDate(endStr);
+    } else if (filter === 'This Month') {
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        startStr = firstDay.toISOString().split('T')[0];
+        setEndDate(endStr);
+    } else if (filter === 'Custom') {
+        return; // Don't update dates automatically
+    }
+
+    if (filter !== 'Custom') {
+        setStartDate(startStr);
+        // Only update endDate if we haven't already (Yesterday handles its own endDate)
+        if (filter !== 'Yesterday') setEndDate(endStr);
+    }
+  };
+
   const filteredOrders = kitchenOrders.filter(order => {
     const statusMatch = filterStatus === 'All' || order.status?.toLowerCase() === filterStatus.toLowerCase();
     const typeMatch = filterType === 'All Types' || order.order_type?.toLowerCase() === filterType.toLowerCase();
     
-    // Date Filter
+    // Date Range Check
     const orderDatePart = new Date(order.order_date).toISOString().split('T')[0];
-    const dateMatch = orderDatePart === filterDate;
+    const dateMatch = orderDatePart >= startDate && orderDatePart <= endDate;
 
     return statusMatch && typeMatch && dateMatch;
   });
@@ -262,12 +297,12 @@ function KitchenPage() {
         </div>
 
         {/* --- FILTERS ROW --- */}
-        <div className="filter-container flex flex-wrap items-end gap-4 justify-between">
+        <div className="filter-container flex flex-wrap items-end gap-4 justify-between bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
             
             {/* Filter by Type (Left) */}
             <div className="w-full md:w-auto flex-1 min-w-[200px] max-w-xs">
                 <label className="block text-sm font-bold mb-1 text-[#F9A825]">Filter by Type</label>
-                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full p-2 rounded border border-gray-300">
+                <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="w-full p-2 rounded border border-gray-300 bg-white">
                     <option value="All Types">All Types</option>
                     <option value="Dine-in">Dine-in</option>
                     <option value="Room Dining">Room Dining</option>
@@ -288,22 +323,46 @@ function KitchenPage() {
                )}
             </div>
 
-            {/* Filter by Date (Right - Buttons Only) */}
-            <div className="w-full md:w-auto flex-shrink-0">
-                <label className="block text-sm font-bold mb-1 text-[#F9A825] text-right">Date View</label>
-                <div className="flex gap-2 justify-end">
-                    <button 
-                        onClick={() => setFilterDate(getYesterdayStr())}
-                        className={`px-4 py-2 rounded font-bold text-sm transition-colors ${filterDate === getYesterdayStr() ? 'bg-[#F9A825] text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'}`}
+            {/* --- DATE FILTER DROPDOWN (Right) --- */}
+            <div className="w-full md:w-auto flex-shrink-0 flex flex-col items-end gap-2">
+                <div className="flex items-center gap-2">
+                    <Calendar size={18} className="text-gray-500"/>
+                    <label className="block text-sm font-bold text-[#F9A825]">Date Period</label>
+                </div>
+                <div className="flex gap-2 items-center flex-wrap justify-end">
+                    {/* The Dropdown */}
+                    <select 
+                        value={quickFilter} 
+                        onChange={handleQuickFilterChange} 
+                        className="p-2 rounded border border-gray-300 bg-white font-medium text-sm focus:ring-2 focus:ring-[#F9A825] outline-none"
                     >
-                        Yesterday
-                    </button>
-                    <button 
-                        onClick={() => setFilterDate(getTodayStr())}
-                        className={`px-4 py-2 rounded font-bold text-sm transition-colors ${filterDate === getTodayStr() ? 'bg-[#F9A825] text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-100'}`}
-                    >
-                        Today
-                    </button>
+                        <option value="Today">Today</option>
+                        <option value="Yesterday">Yesterday</option>
+                        <option value="This Week">This Week</option>
+                        <option value="This Month">This Month</option>
+                        <option value="Custom">Custom Range</option>
+                    </select>
+
+                    {/* Conditional Custom Date Inputs */}
+                    {quickFilter === 'Custom' && (
+                        <div className="flex gap-2 animate-fadeIn">
+                            <input 
+                                type="date" 
+                                value={startDate} 
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="p-2 rounded border border-gray-300 text-sm"
+                                max={endDate} 
+                            />
+                            <span className="text-gray-400 self-center">to</span>
+                            <input 
+                                type="date" 
+                                value={endDate} 
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="p-2 rounded border border-gray-300 text-sm"
+                                min={startDate} 
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
             
@@ -313,7 +372,7 @@ function KitchenPage() {
             <div className="text-center text-white text-xl py-10">Loading active orders...</div>
         ) : filteredOrders.length === 0 ? (
             <div className="text-center text-gray-400 text-lg py-10 flex flex-col items-center">
-                <p>No orders found for {filterDate}.</p>
+                <p>No orders found for {startDate === endDate ? startDate : `${startDate} to ${endDate}`}.</p>
                 {filterStatus !== 'All' && <p className="text-sm">Filter: {filterStatus}</p>}
             </div>
         ) : (
