@@ -267,8 +267,8 @@ function AdminPage() {
                 padding: '8px 16px',
                 fontSize: '1.125rem',
                 fontWeight: 600,
-                color: currentView === 'logs' ? accentColor : '#ffffff',
-                borderBottom: currentView === 'logs' ? `2px solid ${accentColor}` : '2px solid transparent'
+                color: currentView === 'reviews' ? accentColor : '#ffffff',
+                borderBottom: currentView === 'reviews' ? `2px solid ${accentColor}` : '2px solid transparent'
               }}
             >
               Food Reviews

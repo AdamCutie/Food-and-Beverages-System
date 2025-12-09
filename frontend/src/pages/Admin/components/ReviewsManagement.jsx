@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { Star, Trash2, Filter, MessageSquare, X } from 'lucide-react'; // Added MessageSquare for comments
+import { Star, Trash2, Filter, MessageSquare, X, Calendar } from 'lucide-react'; // Added MessageSquare for comments
 import apiClient from '../../../utils/apiClient';
 import '../AdminTheme.css';
 
@@ -14,6 +14,64 @@ const ReviewsManagement = () => {
 
   // Modal for Reading Comments
   const [viewingReview, setViewingReview] = useState(null);
+
+    // --- FILTERS STATE ---
+    const [filterSource, setFilterSource] = useState('All');
+    const [quickFilter, setQuickFilter] = useState('Today');
+    
+    // --- DATE HELPERS (Local Time) ---
+    const getTodayStr = () => new Date().toLocaleDateString('en-CA');
+    
+    const getStartOfWeek = (date) => {
+      const d = new Date(date);
+      const day = d.getDay(); 
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+      return new Date(d.setDate(diff)).toLocaleDateString('en-CA');
+    };
+  
+    const getStartOfMonth = (date) => {
+      const d = new Date(date);
+      return new Date(d.getFullYear(), d.getMonth(), 1).toLocaleDateString('en-CA');
+    };
+  
+    // Initial Dates
+    const [startDate, setStartDate] = useState(getTodayStr());
+    const [endDate, setEndDate] = useState(getTodayStr());
+  
+    // --- TIMEZONE FIXER ---
+    const fixDate = (dateInput) => {
+        if (!dateInput) return new Date();
+        const dateStr = typeof dateInput === 'string' ? dateInput : new Date(dateInput).toISOString();
+        if (dateStr.includes(' ') && !dateStr.includes('T')) return new Date(dateStr.replace(' ', 'T') + 'Z');
+        if (dateStr.includes('T') && !dateStr.endsWith('Z') && !dateStr.includes('+')) return new Date(dateStr + 'Z');
+        return new Date(dateStr);
+    };
+  
+    const getLocalDatePart = (dateObj) => {
+        return new Date(dateObj).toLocaleDateString('en-CA');
+    };
+
+    // --- HANDLERS ---
+  const handleQuickFilterChange = (e) => {
+    const filter = e.target.value;
+    setQuickFilter(filter);
+    const today = new Date();
+    const endStr = getTodayStr();
+    let startStr = endStr;
+
+    if (filter === 'Today') { startStr = endStr; }
+    else if (filter === 'Yesterday') {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        startStr = yesterday.toLocaleDateString('en-CA');
+        setStartDate(startStr); setEndDate(startStr); return;
+    } else if (filter === 'This Week') { startStr = getStartOfWeek(today); }
+    else if (filter === 'This Month') { startStr = getStartOfMonth(today); }
+    else if (filter === 'Custom') { return; }
+
+    if (filter !== 'Custom') { setStartDate(startStr); setEndDate(endStr); }
+  };
+
 
   const fetchReviews = async () => {
     setLoading(true);
@@ -117,11 +175,30 @@ const ReviewsManagement = () => {
             <select 
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className="admin-select"
+                className="admin-btn bg-white text-[#3C2A21] hover:bg-gray-100 shadow-lg border border-gray-200"
             >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
             </select>
+
+            {/* 1. Date Filter Dropdown */}
+            <div className="relative">
+                <select 
+                    value={quickFilter} 
+                    onChange={handleQuickFilterChange} 
+                    className="admin-select-primary appearance-none pr-10"
+                    style={{ minWidth: '150px' }}
+                >
+                    <option value="Today">Today</option>
+                    <option value="Yesterday">Yesterday</option>
+                    <option value="This Week">This Week</option>
+                    <option value="This Month">This Month</option>
+                    <option value="Custom">Custom</option>
+                </select>
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-[#3C2A21]">
+                    <Calendar size={18} />
+                </div>
+            </div>
         </div>
       </div>
 
