@@ -5,76 +5,73 @@ const calculateGrowth = (today, yesterday) => {
   if (yesterday > 0) {
     return parseFloat(((today - yesterday) / yesterday * 100).toFixed(2));
   }
-  return today > 0 ? 100 : 0; // If yesterday = 0 and today > 0 => 100%
+  return today > 0 ? 100 : 0;
 };
 
 // --- GET Dashboard Summary ---
 export const getDashboardSummary = async (req, res) => {
   try {
-    // 1. Total Sales (Keep this)
+    // 1. Total Sales Today (Net Sales: Excluding Cancelled)
     const [salesTodayRows] = await pool.query(`
-      SELECT SUM(amount) AS total
-      FROM fb_payments
-      WHERE payment_status IN ('paid', 'pending')
-      AND DATE(payment_date) = CURDATE()
+      SELECT SUM(total_amount) AS total
+      FROM fb_orders
+      WHERE DATE(order_date) = CURDATE() 
+      AND status != 'cancelled'
     `);
 
     const [salesYesterdayRows] = await pool.query(`
-      SELECT SUM(amount) AS total
-      FROM fb_payments
-      WHERE payment_status = 'paid'
-      AND DATE(payment_date) = CURDATE() - INTERVAL 1 DAY
+      SELECT SUM(total_amount) AS total
+      FROM fb_orders
+      WHERE DATE(order_date) = CURDATE() - INTERVAL 1 DAY 
+      AND status != 'cancelled'
     `);
 
-    const totalSales = salesTodayRows[0].total || 0;
-    const salesGrowth = calculateGrowth(totalSales, salesYesterdayRows[0].total || 0);
+    const totalSales = Number(salesTodayRows[0].total || 0);
+    const salesYesterday = Number(salesYesterdayRows[0].total || 0);
+    const salesGrowth = calculateGrowth(totalSales, salesYesterday);
 
-    // 2. Active Orders (Keep this)
-    const [ordersTodayRows] = await pool.query(`
+    // 2. Active Orders (Current Kitchen Load)
+    const [activeOrdersRows] = await pool.query(`
       SELECT COUNT(*) AS total
       FROM fb_orders
-      WHERE DATE(order_date) = CURDATE() AND status != 'Completed'
+      WHERE status IN ('pending', 'preparing', 'ready')
     `);
 
-    const [ordersYesterdayRows] = await pool.query(`
-      SELECT COUNT(*) AS total
-      FROM fb_orders
-      WHERE DATE(order_date) = CURDATE() - INTERVAL 1 DAY AND status != 'Completed'
+    // 3. Orders Growth (Volume Comparison: Today vs Yesterday)
+    const [volumeTodayRows] = await pool.query(`
+      SELECT COUNT(*) AS total FROM fb_orders 
+      WHERE DATE(order_date) = CURDATE() AND status != 'cancelled'
+    `);
+    const [volumeYesterdayRows] = await pool.query(`
+      SELECT COUNT(*) AS total FROM fb_orders 
+      WHERE DATE(order_date) = CURDATE() - INTERVAL 1 DAY AND status != 'cancelled'
     `);
 
-    const activeOrders = ordersTodayRows[0].total || 0;
-    const ordersGrowth = calculateGrowth(activeOrders, ordersYesterdayRows[0].total || 0);
+    const activeOrders = activeOrdersRows[0].total || 0;
+    const ordersGrowth = calculateGrowth(volumeTodayRows[0].total, volumeYesterdayRows[0].total);
 
-    // 3. Low Stock Items (Keep this)
+    // 4. Low Stock Items
     const [lowStockRows] = await pool.query(`
       SELECT COUNT(*) AS total
       FROM fb_ingredients
-      WHERE stock_level <= reorder_point
+      WHERE stock_level <= COALESCE(reorder_point, 10)
     `);
 
     const lowStock = lowStockRows[0].total || 0;
     const lowStockGrowth = 0; 
 
-    // 4. ✅ CHANGED: Available Tables (Debug version)
+    // 5. Available Tables
     const [tableRows] = await pool.query(`
-      SELECT COUNT(*) AS total
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'Available' THEN 1 ELSE 0 END) as available
       FROM fb_tables
-      WHERE LOWER(status) = 'available'
     `);
-    
-    const [totalTableRows] = await pool.query(`SELECT COUNT(*) AS total FROM fb_tables`);
 
-    const availableTables = tableRows[0].total || 0;
-    const totalTables = totalTableRows[0].total || 0;
+    const availableTables = Number(tableRows[0].available || 0);
+    const totalTables = Number(tableRows[0].total || 0);
 
-    // 🔍 DEBUG LOG: Look for this in your VS Code Terminal!
-    console.log("------------------------------------------------");
-    console.log("📊 DASHBOARD DEBUG:");
-    console.log("Total Tables found in DB:", totalTables);
-    console.log("Available Tables found:", availableTables);
-    console.log("------------------------------------------------");
-
-    // 5. Recent Orders (Keep this)
+    // 6. Recent Orders
     const [recentOrders] = await pool.query(`
       SELECT order_id, client_id, order_date, status, total_amount, order_type, delivery_location
       FROM fb_orders
@@ -82,12 +79,16 @@ export const getDashboardSummary = async (req, res) => {
       LIMIT 5
     `);
 
-    // 6. Stock Alerts (Keep this)
+    // 7. Stock Alerts List
+    // ✅ FIX: Removed JOIN with fb_suppliers. Hardcoded supplier_name.
     const [stockAlerts] = await pool.query(`
-      SELECT ingredient_id, name, stock_level AS stock, 'Default Supplier' AS supplier_name
+      SELECT 
+        ingredient_id, 
+        name, 
+        stock_level AS stock
       FROM fb_ingredients
-      WHERE stock_level <= reorder_point
-      ORDER BY (reorder_point - stock_level) DESC
+      WHERE stock_level <= COALESCE(reorder_point, 10)
+      ORDER BY stock_level ASC
       LIMIT 5
     `);
 
@@ -100,8 +101,8 @@ export const getDashboardSummary = async (req, res) => {
         ordersGrowth,
         lowStock,
         lowStockGrowth,
-        availableTables, // ✅ Send this instead of totalStaff
-        totalTables      // ✅ Useful for context
+        availableTables,
+        totalTables
       },
       recentOrders,
       stockAlerts,
