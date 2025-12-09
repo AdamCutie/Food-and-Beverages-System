@@ -15,6 +15,7 @@ import NotAuthorizedPage from './pages/Auth/NotAuthorizedPage';
 import PaymentSuccess from './pages/Customer/PaymentSuccess.jsx';
 import PaymentCancel from './pages/Customer/PaymentCancel.jsx';
 import InventoryPage from './pages/Kitchen/InventoryPage.jsx';
+import MyOrdersPage from './pages/Customer/MyOrdersPage';
 
 // --- NEW: Import the POS Page ---
 import PosPage from './pages/Kitchen/PosPage.jsx';
@@ -123,6 +124,16 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={['F&B Admin', 'Kitchen Staffs']}>
               <ArchivePage />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* My Orders: (Customer only) */}
+          <Route
+          path="/my-orders"
+          element={
+            <ProtectedRoute allowedRoles={['customer', 'F&B Admin', 'Kitchen Staffs', 'Cashier']}>
+              <MyOrdersPage />
             </ProtectedRoute>
           }
         />

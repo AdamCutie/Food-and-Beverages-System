@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom'; // ✅ Import useNavigate
+import { User, ShoppingBag, LogOut } from 'lucide-react'; // ✅ Added icons
 import { useAuth } from '../context/AuthContext';
-import '../pages/Customer/CustomerTheme.css'; // Import the external CSS
+import '../pages/Customer/CustomerTheme.css';
 
 const ProfileDropdown = () => {
   const { user, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate(); // ✅ Initialize hook
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -21,26 +23,35 @@ const ProfileDropdown = () => {
     };
   }, [dropdownRef]);
 
-  // --- UPDATED: Function to get the display name ---
+  // --- Function to get the display name ---
   const getDisplayName = () => {
     if (!user) return "Guest";
-    // Check for firstName and lastName (now used for both customers and staff)
     if (user.firstName && user.lastName) return `${user.firstName} ${user.lastName}`;
-    if (user.firstName) return user.firstName; // Fallback if only first name exists
-    // Fallback to role if names aren't in token for some reason
+    if (user.firstName) return user.firstName;
     return user.role.charAt(0).toUpperCase() + user.role.slice(1);
   };
   
-  if (!user) return null; // Don't show if not logged in
+  if (!user) return null;
+
+  // ✅ New Handler
+  const handleMyOrders = () => {
+    setIsDropdownOpen(false);
+    navigate('/my-orders');
+  };
+
+  const handleLogout = () => {
+      logout();
+      navigate('/login');
+  };
 
   return (
     <div className="relative" ref={dropdownRef}>
-           {/* Profile Icon Button */}
-            <button
-       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+      {/* Profile Icon Button */}
+      <button
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="header-icon-btn"
       >
-       <User size={22} />
+        <User size={22} />
       </button>
 
       {/* Dropdown Menu */}
@@ -49,14 +60,26 @@ const ProfileDropdown = () => {
           <div className="px-4 py-3">
             <p className="text-sm text-gray-500">Welcome,</p>
             <p className="text-sm font-medium text-gray-900 truncate">
-              {getDisplayName()} {/* <-- Use the new function */}
+              {getDisplayName()}
             </p>
           </div>
+          
           <div className="border-t border-gray-100"></div>
+
+          {/* ✅ My Orders Button */}
           <button
-            onClick={logout} // Call the logout function from context
-            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+            onClick={handleMyOrders}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
           >
+            <ShoppingBag size={16} />
+            My Orders
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 flex items-center gap-2"
+          >
+            <LogOut size={16} />
             Log Out
           </button>
         </div>
