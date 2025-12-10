@@ -1,5 +1,5 @@
 import React from 'react';
-import { Star } from 'lucide-react'; // ✅ Import Star Icon
+import { Star } from 'lucide-react'; 
 import '../CustomerTheme.css';
 
 // Helper to handle image URLs
@@ -53,7 +53,7 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle, theme = "cust
         const { isActive, displayPrice, originalPrice, discountPercent } = getPromoPrice(item);
         const itemForCart = { ...item, price: displayPrice };
         
-        // ✅ NEW: Parse Rating Data
+        // Parse Rating Data
         const rating = parseFloat(item.average_rating || 0);
         const reviewCount = item.total_reviews || 0;
 
@@ -75,17 +75,22 @@ const FoodGrid = ({ items, onAddToCart, onImageClick, layoutStyle, theme = "cust
             </div>
 
             <div className="card-content">
-              <div className="flex justify-between items-start">
-                  <h3 className="item-name">{item.item_name}</h3>
-                  
-                  {/* ✅ NEW: Rating Display Badge */}
-                  {reviewCount > 0 && (
-                    <div className="flex items-center gap-1 bg-orange-50 px-2 py-1 rounded-md border border-orange-100">
-                        <Star size={12} fill="#F9A825" color="#F9A825" />
-                        <span className="text-xs font-bold text-[#3C2A21]">{rating.toFixed(1)}</span>
-                        <span className="text-[10px] text-gray-500">({reviewCount})</span>
+              {/* 1. Title moved to its own block (removed flex justify-between) */}
+              <h3 className="item-name mb-1">{item.item_name}</h3>
+              
+              {/* 2. Rating Display - Moved BELOW title, Clean Style */}
+              <div className="min-h-[20px] mb-2">
+                {reviewCount > 0 ? (
+                    <div className="flex items-center gap-1">
+                        <Star size={20} fill="#F9A825" color="#F9A825" />
+                        <span className="text-xl font-bold text-[#3C2A21]">{rating.toFixed(1)}</span>
+                        <span className="text-[15px] text-gray-400">({reviewCount})</span>
                     </div>
-                  )}
+                ) : (
+                    // Optional: Empty spacer to keep card heights consistent if needed
+                    // Remove this <div/> if you want the description to jump up when no ratings
+                    <div className="h-[18px]"></div> 
+                )}
               </div>
 
               <p className="item-description">
