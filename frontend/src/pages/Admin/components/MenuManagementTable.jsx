@@ -7,6 +7,18 @@ import '../AdminTheme.css';
 import AddItemModal from './AddItemModal';
 import ManageCategoriesModal from './ManageCategoriesModal';
 
+const getImageUrl = (imagePath) => {
+  if (!imagePath) return '/placeholder-food.png';
+  if (imagePath.startsWith('http')) return imagePath; // Already a full URL
+  
+  // Dynamic check: Are we on localhost or the live web?
+  const BASE_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:21917' 
+      : 'https://food-and-beverages-system.onrender.com';
+      
+  return `${BASE_URL}${imagePath}`;
+};
+
 const MenuManagementTable = () => {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -194,10 +206,12 @@ const MenuManagementTable = () => {
             {filteredItems.map((item) => (
               <tr key={item.item_id}>
                 <td>
+                  {/* ✅ FIX: Use the helper function here */}
                   <img 
-                    src={item.image_url ? `http://localhost:21917${item.image_url}` : '/placeholder-food.png'} 
+                    src={getImageUrl(item.image_url)} 
                     alt={item.item_name}
                     className="w-12 h-12 object-cover rounded-md border border-gray-300"
+                    onError={(e) => { e.target.src = '/placeholder-food.png'; }} 
                   />
                 </td>
                 <td className="font-bold">{item.item_name}</td>
