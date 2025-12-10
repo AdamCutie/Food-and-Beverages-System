@@ -28,7 +28,7 @@ const InventoryPage = () => {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
 
-  const fetchIngredients = async (isBackground = false) => {
+ const fetchIngredients = async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
       const response = await apiClient('/inventory'); 
@@ -36,6 +36,21 @@ const InventoryPage = () => {
       const data = await response.json();
       setIngredients(data);
       setError(null);
+
+      if (!isBackground) {
+        const hasLowStock = data.some(item => {
+           const current = parseFloat(item.stock_level);
+           const threshold = parseFloat(item.reorder_point || 10);
+           return current <= threshold;
+        });
+
+        if (hasLowStock) {
+            setFilterStatus('Low Stock');
+        } else {
+            setFilterStatus('All');
+        }
+      }
+
     } catch (err) {
        if (err.message !== 'Session expired') {
         setError(err.message);
@@ -167,7 +182,7 @@ const InventoryPage = () => {
                         <select 
                             value={sortBy}
                             onChange={(e) => setSortBy(e.target.value)}
-                            className="kitchen-select"
+                            className="admin-btn bg-white text-[#3C2A21] hover:bg-gray-100 shadow-lg border border-gray-200"
                         >
                             <option value="name">Name (A-Z)</option>
                             <option value="stock-low">Stock (Lowest First)</option>
