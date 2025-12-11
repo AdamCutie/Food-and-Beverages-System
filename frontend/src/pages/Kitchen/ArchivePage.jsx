@@ -21,38 +21,44 @@ function ArchivePage() {
 
   const { token } = useAuth();
 
-  const fetchOrderDetails = async (orderId) => {
-    try {
-      const response = await apiClient(`/orders/${orderId}`); 
-      if (!response.ok) return null;
-      return await response.json();
-    } catch (err) {
-      return null;
-    }
-  };
+//   const fetchOrderDetails = async (orderId) => {
+//     try {
+//       const response = await apiClient(`/orders/${orderId}`); 
+//       if (!response.ok) return null;
+//       return await response.json();
+//     } catch (err) {
+//       return null;
+//     }
+//   };
 
-  useEffect(() => {
+useEffect(() => {
     const fetchServedOrders = async () => {
       try {
         setLoading(true);
-        // The backend now returns both 'served' and 'cancelled' orders
-        const listResponse = await apiClient('/orders/served'); 
-        if (!listResponse.ok) throw new Error('Failed to fetch served orders');
-        const ordersList = await listResponse.json();
-
-        const ordersWithDetails = await Promise.all(
-          ordersList.map(order => fetchOrderDetails(order.order_id))
-        );
         
-        setServedOrders(ordersWithDetails.filter(order => order !== null));
+        // Pass the dates to the backend
+        const queryParams = new URLSearchParams({
+            startDate: startDate,
+            endDate: endDate
+        }).toString();
+
+        const response = await apiClient(`/orders/served?${queryParams}`); 
+        if (!response.ok) throw new Error('Failed to fetch served orders');
+        
+        const data = await response.json();
+        
+        // Set data directly (No extra looping needed!)
+        setServedOrders(data);
+        
       } catch (err) {
         if (err.message !== 'Session expired') setError(err.message);
       } finally {
         setLoading(false);
       }
     };
+
     if (token) fetchServedOrders();
-  }, [token]);
+  }, [token, startDate, endDate]); // Added dates to dependency
 
   // --- Quick Filter Logic ---
   const handleQuickFilterChange = (e) => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom'; // ✅ Import useNavigate
-import { User, ShoppingBag, LogOut } from 'lucide-react'; // ✅ Added icons
+import { useNavigate } from 'react-router-dom'; 
+import { User, ShoppingBag, LogOut } from 'lucide-react'; 
 import { useAuth } from '../context/AuthContext';
 import '../pages/Customer/CustomerTheme.css';
 
@@ -8,7 +8,7 @@ const ProfileDropdown = () => {
   const { user, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
-  const navigate = useNavigate(); // ✅ Initialize hook
+  const navigate = useNavigate(); 
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -23,7 +23,7 @@ const ProfileDropdown = () => {
     };
   }, [dropdownRef]);
 
-  // --- Function to get the display name ---
+  // Function to get the display name
   const getDisplayName = () => {
     if (!user) return "Guest";
     if (user.firstName && user.lastName) return `${user.firstName} ${user.lastName}`;
@@ -33,7 +33,6 @@ const ProfileDropdown = () => {
   
   if (!user) return null;
 
-  // ✅ New Handler
   const handleMyOrders = () => {
     setIsDropdownOpen(false);
     navigate('/my-orders');
@@ -66,14 +65,16 @@ const ProfileDropdown = () => {
           
           <div className="border-t border-gray-100"></div>
 
-          {/* ✅ My Orders Button */}
-          <button
-            onClick={handleMyOrders}
-            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-          >
-            <ShoppingBag size={16} />
-            My Orders
-          </button>
+          {/* ✅ CONDITION: Only show "My Orders" if role is 'customer' */}
+          {user?.role === 'customer' && (
+            <button
+                onClick={handleMyOrders}
+                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+                <ShoppingBag size={16} />
+                My Orders
+            </button>
+          )}
 
           <button
             onClick={handleLogout}

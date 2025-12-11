@@ -11,7 +11,7 @@ const runQuery = async (sql, params = []) => {
   }
 };
 
-// @desc    Get all dashboard analytics data
+// @desc    Get all dashboard analytics data (Current Month Focus)
 // @route   GET /api/analytics
 // @access  Admin
 export const getDashboardAnalytics = async (req, res) => {
@@ -26,6 +26,11 @@ export const getDashboardAnalytics = async (req, res) => {
       queryParams = [order_type];
     }
 
+    // --- NEW: Date Filter for "Monthly Reset" logic ---
+    // This condition ensures the auxiliary charts only show THIS MONTH'S data.
+    // Use this variable in the queries below.
+    const monthCondition = `AND YEAR(o.order_date) = YEAR(NOW()) AND MONTH(o.order_date) = MONTH(NOW())`;
+
     const [
       salesToday,
       salesYesterday,
@@ -36,7 +41,7 @@ export const getDashboardAnalytics = async (req, res) => {
       orderTypeDistribution,
       peakHours,
     ] = await Promise.all([
-      // --- Sales Trends (Updated: status != 'cancelled') ---
+      // --- Sales Trends (Keep these as they are for comparison) ---
       // Today
       runQuery(
         `SELECT 
@@ -78,7 +83,8 @@ export const getDashboardAnalytics = async (req, res) => {
         queryParams
       ),
 
-      // --- Top Selling Items ---
+      // --- Top Selling Items (UPDATED: Restrict to Current Month) ---
+      // Added 'monthCondition' so this list resets every month
       runQuery(
         `SELECT 
           mi.item_name, 
@@ -87,14 +93,16 @@ export const getDashboardAnalytics = async (req, res) => {
         FROM fb_order_details od
         JOIN fb_menu_items mi ON od.item_id = mi.item_id
         JOIN fb_orders o ON od.order_id = o.order_id
-        WHERE o.status != 'cancelled' ${typeCondition}
+        WHERE o.status != 'cancelled' 
+        ${typeCondition} 
+        ${monthCondition}  -- <--- THIS RESETS IT MONTHLY
         GROUP BY od.item_id, mi.item_name
         ORDER BY total_sales DESC
         LIMIT 7`,
         queryParams
       ),
 
-      // --- Payment Methods (Updated: JOIN to exclude cancelled orders) ---
+      // --- Payment Methods (UPDATED: Restrict to Current Month) ---
       runQuery(
         `SELECT 
           p.payment_method, 
@@ -102,29 +110,36 @@ export const getDashboardAnalytics = async (req, res) => {
           SUM(p.amount) AS total_value 
         FROM fb_payments p
         JOIN fb_orders o ON p.order_id = o.order_id
-        WHERE p.payment_status = 'paid' AND o.status != 'cancelled'
+        WHERE p.payment_status = 'paid' 
+        AND o.status != 'cancelled'
+        ${monthCondition} -- <--- THIS RESETS IT MONTHLY
         GROUP BY p.payment_method`
       ),
 
-      // --- Order Type Distribution ---
+      // --- Order Type Distribution (UPDATED: Restrict to Current Month) ---
+      // Note: We used 'o' alias in monthCondition, so we need to alias the table here or adjust variable
       runQuery(
         `SELECT 
           order_type, 
           COUNT(order_id) AS orders, 
           SUM(total_amount) AS total_value 
-        FROM fb_orders 
-        WHERE status != 'cancelled' ${typeCondition}
+        FROM fb_orders o
+        WHERE status != 'cancelled' 
+        ${typeCondition} 
+        ${monthCondition} -- <--- THIS RESETS IT MONTHLY
         GROUP BY order_type`,
         queryParams
       ),
 
-      // --- Peak Hours ---
+      // --- Peak Hours (UPDATED: Restrict to Current Month) ---
       runQuery(
         `SELECT 
           HOUR(order_date) AS hour, 
           COUNT(order_id) AS order_count 
-        FROM fb_orders 
-        WHERE status != 'cancelled' ${typeCondition}
+        FROM fb_orders o
+        WHERE status != 'cancelled' 
+        ${typeCondition} 
+        ${monthCondition} -- <--- THIS RESETS IT MONTHLY
         GROUP BY hour 
         ORDER BY order_count DESC 
         LIMIT 1`,
@@ -132,11 +147,6 @@ export const getDashboardAnalytics = async (req, res) => {
       ),
     ]);
     
-    console.log("--- ANALYTICS DEBUG ---");
-    console.log("Raw Sales Today Object:", salesToday);
-    console.log("Total Sales Value:", salesToday[0]?.sales);
-    console.log("-----------------------");
-
     res.json({
       salesTrends: {
         today: salesToday[0],

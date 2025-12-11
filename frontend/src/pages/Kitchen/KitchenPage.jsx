@@ -54,30 +54,28 @@ function KitchenPage() {
     }
   };
 
-  const fetchInitialData = async () => {
+const fetchInitialData = async () => {
     setLoading(true);
     try {
+      // 1. OPTIMIZATION: Only fetch today's served orders for the counter
+      // This prevents downloading thousands of old orders just to count today's.
+      const today = new Date().toLocaleDateString('en-CA'); // Formats as YYYY-MM-DD
+      const servedQueryParams = new URLSearchParams({ startDate: today, endDate: today }).toString();
+
       const [kitchenResponse, servedResponse] = await Promise.all([
         apiClient('/orders/kitchen'),
-        apiClient('/orders/served')
+        apiClient(`/orders/served?${servedQueryParams}`) 
       ]);
+
+      // 2. FAST LOAD: The backend now sends items inside the order!
+      // We can use the response directly. No more looping.
       const ordersList = await kitchenResponse.json();
+      setKitchenOrders(ordersList);
+
+      // 3. Set Served Count
       const servedList = await servedResponse.json();
-      
-      const todayDate = getLocalTodayStr();
-      const todayServedCount = servedList.filter(o => {
-          const isServed = o.status === 'served';
-          const orderDatePart = getLocalDatePart(fixDate(o.order_date));
-          const isToday = orderDatePart === todayDate;
-          return isServed && isToday;
-      }).length;
+      setServedCount(servedList.length);
 
-      setServedCount(todayServedCount);
-
-      const ordersWithDetails = await Promise.all(
-        ordersList.map(order => fetchOrderDetails(order.order_id))
-      );
-      setKitchenOrders(ordersWithDetails.filter(o => o !== null));
     } catch (err) {
       console.error(err);
     } finally {
