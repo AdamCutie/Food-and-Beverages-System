@@ -90,11 +90,13 @@ const AnalyticsDashboard = () => {
       { name: "This Month", sales: data.salesTrends.thisMonth?.sales || 0, orders: data.salesTrends.thisMonth?.fb_orders || 0 },
     ].map(d => ({ Period: d.name, 'Total Sales (PHP)': d.sales, 'Total Orders': d.orders }));
 
-    const orderData = data.orderTypeDistribution.map((o) => ({
-      'Order Type': o.order_type,
-      'Order Count': o.orders,
-      'Total Revenue': Number(o.total_value) || 0
-    }));
+const orderData = data.orderTypeDistribution
+      .filter(o => o.order_type !== "Phone Order") // ✅ FILTER HERE TOO
+      .map((o) => ({
+        'Order Type': o.order_type,
+        'Order Count': o.orders,
+        'Total Revenue': Number(o.total_value) || 0
+      }));
 
     const itemsData = data.topSellingItems.map((i, index) => ({
       Rank: index + 1,
@@ -138,11 +140,13 @@ const AnalyticsDashboard = () => {
     { name: "This Month", sales: data.salesTrends.thisMonth?.sales || 0, orders: data.salesTrends.thisMonth?.fb_orders || 0 },
   ];
 
-  const orderTypeData = data.orderTypeDistribution.map((o) => ({
-    name: o.order_type,
-    value: o.orders,
-    revenue: o.total_value
-  }));
+const orderTypeData = (data.orderTypeDistribution || [])
+    .filter((o) => o.order_type !== "Phone Order") // ✅ FILTER: Remove Phone Order
+    .map((o) => ({
+      name: o.order_type,
+      value: o.orders,
+      revenue: o.total_value
+    }));
 
   const paymentMethodData = (data.paymentMethods || []).map((method) => ({
     name: method.payment_method,
