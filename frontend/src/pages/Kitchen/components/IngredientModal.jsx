@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 
 const IngredientModal = ({ isOpen, onClose, onSave, ingredientToEdit }) => {
 
-const unitOptions = [
+  const unitOptions = [
     { value: 'g', label: 'g (grams)' },
     { value: 'ml', label: 'ml (milliliters)' },
     { value: 'pcs', label: 'pcs (pieces)' },
@@ -12,18 +12,21 @@ const unitOptions = [
   const [formData, setFormData] = useState({
     name: '',
     unit_of_measurement: '',
-    stock_level: 0, // Only used when creating a new item
+    stock_level: 0,
+    reorder_point: 10, // ✅ New State for Threshold
   });
+
   const isEditMode = Boolean(ingredientToEdit);
 
   useEffect(() => {
     if (isOpen) {
       if (isEditMode) {
-        // We only edit details here, not stock level
         setFormData({
           name: ingredientToEdit.name || '',
           unit_of_measurement: ingredientToEdit.unit_of_measurement || '',
-          stock_level: ingredientToEdit.stock_level, // Keep it for context, but won't edit
+          stock_level: ingredientToEdit.stock_level, 
+          // ✅ Load existing point or default to 10
+          reorder_point: ingredientToEdit.reorder_point || 10, 
         });
       } else {
         // Reset for new ingredient
@@ -31,6 +34,7 @@ const unitOptions = [
           name: '',
           unit_of_measurement: '',
           stock_level: 0,
+          reorder_point: 10, 
         });
       }
     }
@@ -40,7 +44,21 @@ const unitOptions = [
 
   const handleChange = (e) => {
     const { id, value } = e.target;
-    setFormData((prevData) => ({ ...prevData, [id]: value }));
+
+    setFormData((prevData) => {
+        const newData = { ...prevData, [id]: value };
+
+        // ✅ SMART LOGIC: Auto-suggest threshold based on Unit
+        if (id === 'unit_of_measurement') {
+            if (value === 'g' || value === 'ml') {
+                newData.reorder_point = 1000; // Default to 1kg / 1L
+            } else if (value === 'pcs') {
+                newData.reorder_point = 10;   // Default to 10 pieces
+            }
+        }
+
+        return newData;
+    });
   };
 
   const handleSubmit = (e) => {
@@ -59,6 +77,8 @@ const unitOptions = [
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* 1. Name Input */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">
               Ingredient Name
@@ -74,6 +94,7 @@ const unitOptions = [
             />
           </div>
 
+         {/* 2. Unit Selection (Triggers Smart Logic) */}
          <div>
             <label htmlFor="unit_of_measurement" className="block text-sm font-medium text-gray-700">
               Unit of Measurement
@@ -94,6 +115,31 @@ const unitOptions = [
             </select>
           </div>
 
+          {/* 3. ✅ NEW: Low Stock Threshold Input */}
+          <div className="bg-orange-50 p-3 rounded-md border border-orange-100">
+            <label htmlFor="reorder_point" className="flex items-center gap-2 text-sm font-bold text-orange-800">
+              <AlertTriangle size={16} />
+              Low Stock Threshold (Alert Level)
+            </label>
+            <div className="flex items-center gap-2 mt-1">
+                <input
+                type="number"
+                id="reorder_point"
+                value={formData.reorder_point}
+                onChange={handleChange}
+                required
+                className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-orange-500 focus:border-orange-500"
+                />
+                <span className="text-sm text-gray-500 font-bold min-w-[30px]">
+                    {formData.unit_of_measurement || ''}
+                </span>
+            </div>
+            <p className="text-xs text-orange-600 mt-1">
+                System will alert you when stock falls below this number.
+            </p>
+          </div>
+
+          {/* 4. Initial Stock (Only for New Items) */}
           {!isEditMode && (
             <div>
               <label htmlFor="stock_level" className="block text-sm font-medium text-gray-700">
@@ -122,7 +168,7 @@ const unitOptions = [
             </button>
             <button
               type="submit"
-               className="bg-[#F9A825] text-white font-bold py-2 px-6 rounded hover:bg-[#c47b04] transition-colors"
+              className="bg-[#F9A825] text-white font-bold py-2 px-6 rounded hover:bg-[#c47b04] transition-colors"
             >
               Save Ingredient
             </button>
