@@ -88,9 +88,14 @@ export const getDashboardAnalytics = async (req, res) => {
          JOIN fb_orders o ON od.order_id = o.order_id
          WHERE o.status != 'cancelled' ${typeCondition} ${monthCondition}
          GROUP BY od.item_id, mi.item_name
-         ORDER BY total_sales DESC LIMIT 7`,
-        queryParams, []
+         
+         -- 🚨 CHANGE THIS LINE:
+         -- OLD: ORDER BY total_sales DESC LIMIT 7
+         ORDER BY total_sold DESC LIMIT 7`, 
+        queryParams,
+        []
       ),
+      
       // 6. Payment Methods (Ignored Filter usually, but we keep it clean)
       safeQuery(
         `SELECT p.payment_method, COUNT(p.payment_id) AS transactions, SUM(p.amount) AS total_value 

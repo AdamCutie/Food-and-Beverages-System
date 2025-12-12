@@ -157,7 +157,7 @@ const orderTypeData = (data.orderTypeDistribution || [])
   const topItemsData = data.topSellingItems.map((i) => ({
   name: i.item_name,
   sold: Number(i.total_sold), 
-  sales: Number(i.total_sales), 
+  sales: Number(i.total_sales),
 }));
 
   return (
@@ -286,7 +286,7 @@ const orderTypeData = (data.orderTypeDistribution || [])
               <XAxis dataKey="name" stroke="#3C2A21" />
               <YAxis stroke="#3C2A21" />
               <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#fff2e0', borderColor: '#D1C0B6', color: '#3C2A21' }} />
-              <Bar dataKey="sales" fill="#3C2A21" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="sold" fill="#3C2A21" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
