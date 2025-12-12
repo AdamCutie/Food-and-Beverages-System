@@ -10,7 +10,7 @@ import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 const router = express.Router();
 
 // These routes are only for logged-in customers
-router.use(protect, authorizeRoles("customer"));
+router.use(protect, authorizeRoles("customer", "F&B Admin", "Waiter", "Kitchen Staffs", "Cashier"));
 
 // GET /api/notifications
 router.get("/", getMyNotifications);

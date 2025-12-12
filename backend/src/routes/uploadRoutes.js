@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js"; 
 
 const router = express.Router();
 
@@ -37,7 +38,11 @@ const upload = multer({
 });
 
 // Define the upload route: POST /api/upload
-router.post('/', upload.single('image'), (req, res) => {
+// ✅ Now 'protect' and 'authorizeRoles' are defined because we imported them above
+router.post('/', protect, authorizeRoles("F&B Admin"), upload.single('image'), (req, res) => {
+  if (!req.file) {
+      return res.status(400).send({ message: "No file uploaded" });
+  }
   // When the file is uploaded successfully, multer adds a 'file' object to the request.
   // We send back the path to the file, which we will save in the database.
   res.send({

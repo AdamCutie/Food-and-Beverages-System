@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Sliders, Edit2, AlertTriangle, CheckCircle, Filter } from 'lucide-react';
+import { Plus, Sliders, Edit2, AlertTriangle, CheckCircle, Filter, Trash2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import apiClient from '../../utils/apiClient';
-// ✅ Reverted to KitchenTheme (No Admin Import)
 import './KitchenTheme.css'; 
 
 // Import Modals
@@ -26,9 +25,13 @@ const InventoryPage = () => {
   // --- MODAL STATE ---
   const [isIngredientModalOpen, setIsIngredientModalOpen] = useState(false);
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+  
+  // ✅ NEW: Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  
   const [selectedIngredient, setSelectedIngredient] = useState(null);
 
- const fetchIngredients = async (isBackground = false) => {
+  const fetchIngredients = async (isBackground = false) => {
     try {
       if (!isBackground) setLoading(true);
       const response = await apiClient('/inventory'); 
@@ -82,13 +85,36 @@ const InventoryPage = () => {
   const handleOpenEditModal = (ing) => { setSelectedIngredient(ing); setIsIngredientModalOpen(true); };
   const handleOpenAdjustModal = (ing) => { setSelectedIngredient(ing); setIsAdjustModalOpen(true); };
   
+  // ✅ NEW: Delete Handlers
+  const handleOpenDeleteModal = (ing) => { setSelectedIngredient(ing); setIsDeleteModalOpen(true); };
+  
   const handleCloseModals = () => {
     setIsIngredientModalOpen(false);
     setIsAdjustModalOpen(false);
+    setIsDeleteModalOpen(false);
     setSelectedIngredient(null);
   };
 
   const handleSaveIngredient = async (formData) => {
+
+    const newName = formData.name.trim().toLowerCase();
+    
+    const duplicate = ingredients.find(ing => {
+
+        const existingName = ing.name.trim().toLowerCase();
+        
+        if (selectedIngredient) {
+            return existingName === newName && ing.ingredient_id !== selectedIngredient.ingredient_id;
+        }
+        return existingName === newName;
+    });
+
+
+    if (duplicate) {
+        toast.error(`"${formData.name}" already exists in inventory!`);
+        return; 
+    }
+    
     const isEditMode = Boolean(selectedIngredient);
     const url = isEditMode ? `/inventory/${selectedIngredient.ingredient_id}` : '/inventory';
     const method = isEditMode ? 'PUT' : 'POST';
@@ -112,6 +138,22 @@ const InventoryPage = () => {
         handleCloseModals();
         fetchIngredients(true); 
     } catch (err) { toast.error(err.message); }
+  };
+
+  // ✅ NEW: Confirm Delete Logic
+  const handleDeleteIngredient = async () => {
+    if (!selectedIngredient) return;
+    try {
+        const response = await apiClient(`/inventory/${selectedIngredient.ingredient_id}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to delete ingredient');
+        toast.success('Ingredient deleted successfully');
+        handleCloseModals();
+        fetchIngredients(true);
+    } catch (err) {
+        toast.error(err.message);
+    }
   };
 
   // --- FILTER & SORT LOGIC ---
@@ -160,7 +202,7 @@ const InventoryPage = () => {
 
                 <div className="flex flex-wrap items-center gap-4 justify-end">
                     
-                    {/* Filter Dropdown (Orange) */}
+                    {/* Filter Dropdown */}
                     <div className="relative">
                         <select 
                             value={filterStatus}
@@ -177,7 +219,7 @@ const InventoryPage = () => {
                         </div>
                     </div>
 
-                    {/* Sort Dropdown (White) */}
+                    {/* Sort Dropdown */}
                     <div className="relative">
                         <select 
                             value={sortBy}
@@ -207,55 +249,65 @@ const InventoryPage = () => {
                     <div className="text-center text-red-500 text-xl py-10">Error: {error}</div>
             ) : (
                     <div className="kitchen-table-container">
-                    <table className="kitchen-table">
-                        <thead>
-                        <tr>
-                            <th>Ingredient Name</th>
-                            <th>Status</th>
-                            <th className="text-center">Current Stock</th>
-                            <th>Unit</th>
-                            <th className="text-center">Actions</th>
-                        </tr>
-                        </thead>
+                    <table className="kitchen-table w-full border-collapse">
+                    <thead>
+                    <tr className="border-b border-gray-200">
+                        <th className="py-4 text-center w-1/4">Ingredient Name</th>
+                        <th className="py-4 text-center w-1/6">Status</th>
+                        <th className="py-4 text-center w-1/6">Current Stock</th>
+                        <th className="py-4 text-center w-1/6">Unit</th>
+                        <th className="py-4 text-center w-1/12">Actions</th>
+                    </tr>
+                    </thead>
                         <tbody>
-                        {filteredList.map((item) => {
-                            const current = parseFloat(item.stock_level);
-                            const threshold = parseFloat(item.reorder_point || 10);
-                            const isLow = current <= threshold;
+{filteredList.map((item) => {
+    const current = parseFloat(item.stock_level);
+    const threshold = parseFloat(item.reorder_point || 10);
+    const isLow = current <= threshold;
 
-                            return (
-                                <tr key={item.ingredient_id}>
-                                <td className="font-bold">{item.name}</td>
-                                
-                                {/* Status Badge */}
-                                <td>
-                                    <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase border ${isLow ? 'bg-red-100 text-red-700 border-red-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
-                                        {isLow ? <AlertTriangle size={14}/> : <CheckCircle size={14}/>}
-                                        {isLow ? 'Low Stock' : 'Good'}
-                                    </div>
-                                </td>
+    return (
+        <tr key={item.ingredient_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+            
+            {/* 1. NAME: text-center, w-1/4 (Matches Header) */}
+            <td className="py-4 font-bold text-left w-1/3">{item.name}</td>
+            
+            {/* 2. STATUS: text-center, w-1/6 (Matches Header) */}
+            <td className="py-4 text-left w-1/6">
+                <div className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold uppercase border ${isLow ? 'bg-red-100 text-red-700 border-red-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
+                        {isLow ? <AlertTriangle size={14}/> : <CheckCircle size={14}/>}
+                        {isLow ? 'Low Stock' : 'Good'}
+                </div>
+            </td>
 
-                                <td className={`text-center font-bold text-lg ${isLow ? 'text-red-600' : 'text-gray-700'}`}>
-                                    {current.toFixed(2)}
-                                </td>
-                                <td className="text-sm text-gray-500">{item.unit_of_measurement}</td>
-                                <td className="text-center">
-                                    <div className="flex justify-center gap-3">
-                                        <button onClick={() => handleOpenAdjustModal(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Adjust Stock">
-                                            <Sliders size={18} />
-                                        </button>
-                                        <button onClick={() => handleOpenEditModal(item)} className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors" title="Edit Details">
-                                            <Edit2 size={18} />
-                                        </button>
-                                    </div>
-                                </td>
-                                </tr>
-                            );
-                        })}
-                        {filteredList.length === 0 && (
-                            <tr><td colSpan="5" className="text-center p-8 text-gray-500">No ingredients found matching filters.</td></tr>
-                        )}
-                        </tbody>
+            {/* 3. STOCK: text-center, w-1/6 (Matches Header) */}
+            <td className={`py-4 text-center font-bold text-lg w-1/6 ${isLow ? 'text-red-600' : 'text-gray-700'}`}>
+                {Math.floor(current)}
+            </td>
+            
+            {/* 4. UNIT: text-center, w-1/6 (Matches Header) */}
+            <td className="py-4 text-left text-gray-500 text-center w-1/6">{item.unit_of_measurement}</td>
+            
+            {/* 5. ACTIONS: text-center, w-1/4 (Matches Header) */}
+            <td className="py-4 text-left w-1/12">
+                <div className="flex justify-start ">
+                        <button onClick={() => handleOpenAdjustModal(item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Adjust Stock">
+                            <Sliders size={18} />
+                        </button>
+                        <button onClick={() => handleOpenEditModal(item)} className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors" title="Edit Details">
+                            <Edit2 size={18} />
+                        </button>
+                        <button onClick={() => handleOpenDeleteModal(item)} className="p-2 text-red-500 hover:bg-red-50 rounded transition-colors" title="Delete Ingredient">
+                            <Trash2 size={18} />
+                        </button>
+                            </div>
+                        </td>
+                    </tr>
+                );
+            })}
+            {filteredList.length === 0 && (
+                <tr><td colSpan="5" className="text-center p-8 text-gray-500">No ingredients found matching filters.</td></tr>
+            )}
+            </tbody>
                     </table>
                     </div>
             )}
@@ -263,6 +315,47 @@ const InventoryPage = () => {
             {/* Modals */}
             <IngredientModal isOpen={isIngredientModalOpen} onClose={handleCloseModals} onSave={handleSaveIngredient} ingredientToEdit={selectedIngredient} />
             <AdjustStockModal isOpen={isAdjustModalOpen} onClose={handleCloseModals} onAdjust={handleAdjustStock} ingredient={selectedIngredient} />
+            
+            {/* ✅ NEW: Delete Confirmation Modal */}
+            {isDeleteModalOpen && selectedIngredient && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn" style={{backgroundColor: 'rgba(0,0,0,0.6)'}}>
+                    <div className="bg-white rounded-lg p-6 w-full max-w-sm shadow-2xl relative border-t-4 border-red-500">
+                        <button 
+                            onClick={handleCloseModals}
+                            className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+                        >
+                            <X size={20} />
+                        </button>
+                        
+                        <div className="flex flex-col items-center text-center mb-6">
+                            <div className="bg-red-100 p-3 rounded-full mb-3">
+                                <Trash2 size={32} className="text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-800">Delete Ingredient?</h3>
+                            <p className="text-sm text-gray-500 mt-2">
+                                Are you sure you want to delete <span className="font-bold text-gray-800">{selectedIngredient.name}</span>? 
+                                <br/>This action cannot be undone.
+                            </p>
+                        </div>
+                        
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={handleCloseModals}
+                                className="flex-1 py-2 rounded-lg font-bold border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={handleDeleteIngredient}
+                                className="flex-1 py-2 rounded-lg font-bold bg-red-600 text-white hover:bg-red-700 shadow-md transition-colors"
+                            >
+                                Yes, Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
       </div>
     </>

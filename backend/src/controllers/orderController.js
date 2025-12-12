@@ -600,26 +600,36 @@ export const getKitchenOrders = async (req, res) => {
                 o.order_id, 
                 o.order_date, 
                 o.order_type, 
-                o.delivery_location, 
+                
+                -- ✅ ROBUST FIX: 
+                -- If we found a linked Room Number (regardless of order type), use it.
+                -- Otherwise, rely on the saved text.
+                CASE 
+                    WHEN tr.room_num IS NOT NULL THEN CONCAT('Room ', tr.room_num)
+                    ELSE o.delivery_location 
+                END AS delivery_location,
+
                 o.status, 
                 o.total_amount,
                 COALESCE(c.first_name, o.guest_name) AS first_name,
                 COALESCE(c.last_name, '') AS last_name,
-                d.order_detail_id,       -- Get item details
-                m.item_name,             -- Get item name
+                d.order_detail_id,       
+                m.item_name,             
                 d.quantity, 
                 d.instructions
             FROM fb_orders o
             LEFT JOIN tbl_client_users c ON o.client_id = c.client_id
             LEFT JOIN fb_order_details d ON o.order_id = d.order_id
             LEFT JOIN fb_menu_items m ON d.item_id = m.item_id
+            -- ✅ JOIN tbl_rooms to translate "13" -> "101"
+            LEFT JOIN tbl_rooms tr ON o.room_id = tr.room_id
             WHERE o.status IN ('pending', 'preparing', 'ready')
             ORDER BY o.order_date ASC
         `;
         
         const [rows] = await pool.query(sql);
 
-        // Group flat rows into nested Order objects
+        // (Keep the rest of your mapping logic exactly the same...)
         const ordersMap = new Map();
         
         rows.forEach(row => {
@@ -628,16 +638,15 @@ export const getKitchenOrders = async (req, res) => {
                     order_id: row.order_id,
                     order_date: row.order_date,
                     order_type: row.order_type,
-                    delivery_location: row.delivery_location,
+                    delivery_location: row.delivery_location, 
                     status: row.status,
                     total_amount: row.total_amount,
                     first_name: row.first_name,
                     last_name: row.last_name,
-                    items: [] // Initialize items array
+                    items: [] 
                 });
             }
             
-            // Add item to the order if it exists
             if (row.order_detail_id) {
                 ordersMap.get(row.order_id).items.push({
                     order_detail_id: row.order_detail_id,
@@ -648,7 +657,6 @@ export const getKitchenOrders = async (req, res) => {
             }
         });
 
-        // Convert Map to Array
         res.json(Array.from(ordersMap.values()));
 
     } catch (error) {

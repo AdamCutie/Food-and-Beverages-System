@@ -349,7 +349,7 @@ const fetchInitialData = async () => {
                             <div className="kitchen-card-body">
                                 <p><span className="info-label">Type:</span> {order.order_type}</p>
                                 <p><span className="info-label">Loc:</span> {order.delivery_location}</p>
-                                <p><span classname="info-label">Name:</span>{order.first_name}</p>
+                                <p><span classname="info-label">Name: </span>{order.first_name}</p>
                                 <div className="mt-2 border-t pt-2">
                                     <p className="font-bold text-sm mb-1">Items:</p>
                                     {order.items?.map((item, idx) => (

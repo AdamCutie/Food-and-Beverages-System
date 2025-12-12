@@ -58,7 +58,7 @@ const InternalNavBar = () => {
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
         position: 'sticky',
         top: 0,
-        zIndex: 10,
+        zIndex: 60,
     }}>
       {/* Left: Logo */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
