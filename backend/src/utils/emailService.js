@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Helper function to generate HTML and send email
-const sendReceiptEmail = async (clientEmail, clientName, orderData, orderId) => {
+export const sendReceiptEmail = async (clientEmail, clientName, orderData, orderId) => {
     
     // 1. Build the Items HTML list
     const itemsHtml = orderData.order_items.map(item => `
