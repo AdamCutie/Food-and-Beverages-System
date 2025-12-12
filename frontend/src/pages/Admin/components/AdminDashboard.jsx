@@ -222,7 +222,7 @@ const AdminDashboard = ({ onNavigate }) => {
 
       {/* Footer */}
       <div className="text-center mt-10 text-amber-400 font-semibold">
-        Celestia Hotel • Quezon City
+        The Celestia Hotel • 100 Pasado St. Villa Celestia, Flat Uno, Palawan, Philippines
       </div>
     </div>
   );

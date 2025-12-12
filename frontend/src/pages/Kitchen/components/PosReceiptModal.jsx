@@ -103,7 +103,7 @@ const PosReceiptModal = ({ isOpen, onClose, receiptData }) => {
                 {/* Header */}
                 <div className="text-center mb-4 border-b border-black pb-2">
                     <h1 className="text-lg font-bold uppercase mb-1">Celestia Hotel Food and Beverages</h1>
-                    <p>123 Culinary Ave, Food City</p>
+                    <p>The Celestia Hotel • 100 Pasado St. Villa Celestia, Flat Uno, Palawan, Philippines</p>
                     <p>Tel: (02) 8123-4567</p>
                     <p className="mt-2 font-bold">OFFICIAL RECEIPT</p>
                 </div>
