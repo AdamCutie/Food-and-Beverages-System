@@ -35,8 +35,26 @@ const ItemDetailsPage = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
-  // ... (keep getImageUrl & useEffect for Item Details unchanged) ...
-  const getImageUrl = (imagePath) => { /* ... */ return imagePath; }; // (Use your existing function)
+  const getImageUrl = (imagePath) => {
+    // 1. Check if empty
+    if (!imagePath) return 'https://via.placeholder.com/400x300.png?text=No+Image';
+
+    // 2. Check if already absolute (e.g., https://cloudinary...)
+    if (imagePath.startsWith('http')) return imagePath;
+
+    // 3. Define Base URL
+    const BASE_URL = window.location.hostname === 'localhost' 
+        ? 'http://localhost:21917' 
+        : 'https://food-and-beverages-system.onrender.com';
+
+    // 4. ✅ AUTO-FIX SLASHES: Ensure exactly one slash connects them
+    // Remove trailing slash from Base
+    const cleanBase = BASE_URL.replace(/\/$/, '');
+    // Ensure leading slash on Path
+    const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+
+    return `${cleanBase}${cleanPath}`;
+  };
 
   useEffect(() => {
      // ... (Your existing fetchDetails logic) ...
@@ -121,9 +139,25 @@ const ItemDetailsPage = () => {
          </div>
          <div className="max-w-5xl mx-auto bg-[#FFF8E1] rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row" style={{ height: '550px' }}>
             <div className="w-full md:w-1/2 h-full relative">
-                <img src={getImageUrl(item.image_url)} alt={item.item_name} className="w-full h-full object-cover" />
-                {isPromo && <span className="absolute top-4 left-4 bg-red-600 text-white text-sm font-bold px-3 py-1 rounded-full shadow-md">{item.promo_discount_percentage}% OFF</span>}
-            </div>
+    {/* ✅ DEBUG: Log the path to see what is breaking */}
+    {console.log("Raw Path:", item.image_url, " | Final URL:", getImageUrl(item.image_url))}
+    
+    <img 
+        src={getImageUrl(item.image_url)} 
+        alt={item.item_name}
+        className="w-full h-full object-cover"
+        // ✅ SAFETY NET: If image fails, switch to placeholder automatically
+        onError={(e) => {
+            e.target.onerror = null; 
+            e.target.src = 'https://via.placeholder.com/400x300.png?text=Image+Not+Found';
+        }}
+    />
+    {isPromo && (
+        <span className="absolute top-4 left-4 bg-red-600 text-white text-sm font-bold px-3 py-1 rounded-full shadow-md">
+            {item.promo_discount_percentage}% OFF
+        </span>
+    )}
+</div>
             <div className="w-full md:w-1/2 flex flex-col h-full">
                 <div className="flex-1 p-8 md:p-10 overflow-y-auto custom-scrollbar">
                     <h1 className="text-4xl font-extrabold text-[#0B3D2E] mb-2 leading-tight">{item.item_name}</h1>
