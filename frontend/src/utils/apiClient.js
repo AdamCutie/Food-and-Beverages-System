@@ -6,11 +6,10 @@ const API_URL = import.meta.env.MODE === 'development'
   : '/api';
 
 /**
- * A wrapper around the native fetch function that automatically:
- * 1. Prepends the API_BASE_URL to requests.
- * 2. Attaches the JWT token (if it exists) to the Authorization header.
- * 3. Catches 401 (Unauthorized) errors, shows a toast, and redirects to login.
- * 4. Correctly handles FormData for file uploads.
+ * A wrapper around the native fetch function that handles:
+ * 1. Base URL & Authentication
+ * 2. Automatic FormData handling
+ * 3. Global Error Handling (401 Session Expired & 429 Rate Limit)
  */
 const apiClient = async (url, options = {}) => {
   const token = localStorage.getItem('authToken');
@@ -20,19 +19,16 @@ const apiClient = async (url, options = {}) => {
     options.headers = {};
   }
 
-  // --- THIS IS THE FIX ---
+  // --- 1. FormData Fix ---
   if (options.body instanceof FormData) {
-    // If body is FormData, we MUST let the browser set the
-    // Content-Type header so it can include the 'boundary'.
-    // We delete any Content-Type header the user might have passed.
+    // Let browser set Content-Type for FormData (multipart/form-data)
     delete options.headers['Content-Type']; 
   } else if (!options.headers['Content-Type']) {
-    // If it's not FormData and no C-T is set, default to JSON.
+    // Default to JSON for everything else
     options.headers['Content-Type'] = 'application/json';
   }
-  // --- END OF FIX ---
 
-  // Add the Authorization header if the token exists
+  // --- 2. Auth Token ---
   if (token) {
     options.headers['Authorization'] = `Bearer ${token}`;
   }
@@ -40,22 +36,42 @@ const apiClient = async (url, options = {}) => {
   try {
     const response = await fetch(`${API_URL}${url}`, options);
 
-    // Check for 401 error (Unauthorized)
-    if (response.status === 401) {
+    // ================================================================
+    // ✅ NEW: GLOBAL RATE LIMIT CHECK (Status 429)
+    // ================================================================
+    if (response.status === 429) {
+      // 1. Dispatch event to the GlobalHandler in App.jsx
+      window.dispatchEvent(new Event('rate-limit-reached'));
       
-      // --- THIS IS THE FIX ---
-      // Only force a reload IF the 401 error did NOT come from the login page.
-      // A 401 from /auth/login is just a "wrong password", not an "expired session".
+      // 2. Return a safe "dummy" response to prevent the calling component 
+      // from crashing before the UI switches to the RateLimit screen.
+      return { 
+        ok: false, 
+        status: 429, 
+        json: async () => ({ message: "Rate limit reached" }) 
+      };
+    }
+
+    // ================================================================
+    // ⚠️ EXISTING: SESSION EXPIRY CHECK (Status 401)
+    // ================================================================
+    if (response.status === 401) {
+      // Only force logout if the error didn't come from the Login Page itself
       if (url !== '/auth/login') { 
         localStorage.removeItem('authToken');
+        
+        // Dispatch optional event if you want other components to react
+        window.dispatchEvent(new Event('session-expired')); 
+
         toast.error('Your session has expired. Please log in again.');
         
-        window.location.href = '/login'; 
+        // Slight delay to allow toast to show before redirect
+        setTimeout(() => {
+             window.location.href = '/login'; 
+        }, 1000);
         
         throw new Error('Session expired');
       }
-      // If it WAS from /auth/login, we do nothing and just return the error response
-      // to be handled by the LoginPage.
     }
 
     return response;

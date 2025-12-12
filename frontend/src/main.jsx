@@ -9,7 +9,7 @@ import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from "./context/NotificationContext.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
- // <React.StrictMode>
+ <React.StrictMode>
     <BrowserRouter>
       <AuthProvider> 
         <SocketProvider>
@@ -21,5 +21,5 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         </SocketProvider>
       </AuthProvider>
     </BrowserRouter>
- // </React.StrictMode>
+ </React.StrictMode>
 );
