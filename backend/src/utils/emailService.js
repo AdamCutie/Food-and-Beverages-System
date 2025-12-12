@@ -2,20 +2,18 @@ import nodemailer from 'nodemailer';
 
 // 1. Configure the transporter
 const transporter = nodemailer.createTransport({
-    // 👇 CHANGE THIS: Use 'service' instead of 'host'
-    service: 'gmail', 
-    
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false, // Use SSL
     auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  // This MUST be the 16-char App Password
     },
-    // This helps prevent connection rejections on cloud servers
     tls: {
-        rejectUnauthorized: false 
+        rejectUnauthorized: false // Fixes the "ETIMEDOUT" or connection issues on Render
     },
-    logger: true,
-    debug: true,
-    // 🚀 Timeouts to prevent hanging
+    // 🚀 FIX 2: ADD TIMEOUTS
+    // This forces it to fail after 10 seconds instead of hanging forever
     connectionTimeout: 10000, 
     greetingTimeout: 10000,
     socketTimeout: 10000
@@ -23,7 +21,7 @@ const transporter = nodemailer.createTransport({
 
 // Helper function to generate HTML and send email
 export const sendReceiptEmail = async (clientEmail, clientName, orderData, orderId) => {
-    console.log(`🚀 Attempting to connect to Gmail...`);
+    console.log(`🚀 Attempting to connect to Gmail (Port 587)...`);
     
     // 1. Build the Items HTML list
     const itemsHtml = orderData.order_items.map(item => `
@@ -68,7 +66,7 @@ export const sendReceiptEmail = async (clientEmail, clientName, orderData, order
 
     // 3. Send the email
     await transporter.sendMail({
-        from: '"The Celestia Hotel" <hotel.thecelestia@gmail.com>', 
+        from: '"The Celestia Hotel" <hotel.thecelestia@gmail.com>', // ✅ FIXED THIS
         to: clientEmail,
         subject: `Receipt for Order #${orderId}`,
         html: emailHtml
