@@ -3,25 +3,19 @@ import nodemailer from 'nodemailer';
 // 1. Configure the transporter
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // Use SSL
+    port: 465,
+    secure: true, // Use SSL
     auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  // This MUST be the 16-char App Password
     },
     tls: {
         rejectUnauthorized: false // Fixes the "ETIMEDOUT" or connection issues on Render
-    },
-    // 🚀 FIX 2: ADD TIMEOUTS
-    // This forces it to fail after 10 seconds instead of hanging forever
-    connectionTimeout: 10000, 
-    greetingTimeout: 10000,
-    socketTimeout: 10000
+    }
 });
 
 // Helper function to generate HTML and send email
 export const sendReceiptEmail = async (clientEmail, clientName, orderData, orderId) => {
-    console.log(`🚀 Attempting to connect to Gmail (Port 587)...`);
     
     // 1. Build the Items HTML list
     const itemsHtml = orderData.order_items.map(item => `
