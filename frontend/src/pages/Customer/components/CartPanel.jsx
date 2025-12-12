@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; 
-import { X, Trash2, Minus, Plus, MessageSquare } from 'lucide-react';
+import { X, Trash2, Minus, Plus, MessageSquare, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
 import apiClient from '../../../utils/apiClient';
 import '../CustomerTheme.css';
 import { useSocket } from '../../../context/SocketContext';
@@ -8,7 +8,8 @@ import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext'; 
 import toast from 'react-hot-toast';
 
-const CartPanel = ({ isOpen, onClose, activeRoom }) => {
+// ✅ REMOVED: activeRoom prop (We fetch it internally now for reliability)
+const CartPanel = ({ isOpen, onClose }) => {
   const { cart, updateQuantity, removeFromCart, updateInstruction, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -18,36 +19,51 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
 
   // Location Data
   const [tables, setTables] = useState([]);
-  const [rooms, setRooms] = useState([]);
   const [selectedTableId, setSelectedTableId] = useState('');
-  const [selectedRoomId, setSelectedRoomId] = useState('');
+  
+  // ✅ NEW: Internal State for Room Check
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [isFetchingRoom, setIsFetchingRoom] = useState(false);
 
   const { socket } = useSocket();
 
-  // 1. Fetch Location Data
+  // 1. Fetch Location Data (Tables Only - Removed Rooms fetch)
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchTables = async () => {
       try {
-        const [tableRes, roomRes] = await Promise.all([
-            apiClient('/tables'),
-            apiClient('/rooms')
-        ]);
+        const tableRes = await apiClient('/tables');
         if (tableRes.ok) setTables(await tableRes.json());
-        if (roomRes.ok) setRooms(await roomRes.json());
       } catch (error) {
-        console.error("Failed to load location data", error);
+        console.error("Failed to load tables", error);
       }
     };
-    fetchData();
+    fetchTables();
   }, []);
 
-  // 2. Auto-Select Room if provided (Auto-Room Feature)
+  // ✅ 2. NEW: Fetch Active Room when "Room Dining" is selected
   useEffect(() => {
-    if (activeRoom && activeRoom.room_id) {
-        setOrderType('Room Dining');
-        setSelectedRoomId(activeRoom.room_id);
+    if (orderType === 'Room Dining') {
+        const checkRoom = async () => {
+            setIsFetchingRoom(true);
+            try {
+                // Calls the backend endpoint we fixed
+                const res = await apiClient('/rooms/my-active-room');
+                if (res.ok) {
+                    const data = await res.json();
+                    setActiveRoom(data.room);
+                } else {
+                    setActiveRoom(null);
+                }
+            } catch (error) {
+                console.error("Room check failed", error);
+                setActiveRoom(null);
+            } finally {
+                setIsFetchingRoom(false);
+            }
+        };
+        checkRoom();
     }
-  }, [activeRoom]);
+  }, [orderType]);
 
   // 3. Real-time Table Updates
   useEffect(() => {
@@ -73,7 +89,7 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
   const vatAmount = (subtotal + serviceAmount) * 0.12;
   const grandTotal = subtotal + serviceAmount + vatAmount;
 
-  // ✅ 5. PAYMONGO CHECKOUT LOGIC
+  // 5. Checkout Logic
   const handlePlaceOrder = async () => {
     if (!user) {
         toast.error("Please login to place an order.");
@@ -85,17 +101,17 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
     const toastId = toast.loading('Connecting to PayMongo...');
 
     try {
-        // Determine Location IDs
         let tableIdToSend = null;
         let roomIdToSend = null;
 
         if (orderType === 'Dine-in') {
             tableIdToSend = selectedTableId; 
         } else if (orderType === 'Room Dining') {
-            roomIdToSend = selectedRoomId;
+            // ✅ USE INTERNAL STATE
+            roomIdToSend = activeRoom?.room_id;
         }
 
-        // Payload for /payments/checkout
+        // Payload
         const checkoutData = {
             cart_items: cart.map(item => ({
                 item_id: item.item_id,
@@ -106,14 +122,12 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
             table_id: tableIdToSend, 
             room_id: roomIdToSend,
 
-            // Combine all instructions for the main order note
             special_instructions: cart
                 .filter(item => item.instructions)
                 .map(item => `${item.item_name}: ${item.instructions}`)
                 .join('; ') || null
         };
 
-        // ✅ Correct Endpoint: /payments/checkout (Not /orders)
         const response = await apiClient('/payments/checkout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -128,11 +142,7 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
 
         if (result.checkout_url) {
             toast.success('Redirecting to payment...', { id: toastId });
-            // Clear cart locally since we are handing off to payment
-            // (Optional: You might want to keep it until success, but this prevents duplicates)
             clearCart(); 
-            
-            // 🚀 REDIRECT TO PAYMONGO
             window.location.href = result.checkout_url;
         } else {
             throw new Error("No checkout URL received");
@@ -160,7 +170,7 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
         {/* Content */}
         <div className="cart-content">
           
-          {/* Order Type */}
+          {/* Order Type Switcher */}
           <div className="order-type-container">
             {['Dine-in', 'Room Dining'].map(type => (
                 <button
@@ -173,10 +183,10 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
             ))}
           </div>
 
-          {/* Location Select */}
+          {/* Location / Status Display */}
           <div className="location-container">
             <label className="location-label">
-              {orderType === 'Dine-in' ? 'Select Table' : 'Select Room'}
+              {orderType === 'Dine-in' ? 'Select Table' : 'Delivery Location'}
             </label>
             <div className="location-select-wrapper">
                 {orderType === 'Dine-in' ? (
@@ -198,22 +208,43 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
                         ))}
                     </select>
                 ) : (
-                    <select 
-                        value={selectedRoomId} 
-                        onChange={(e) => setSelectedRoomId(e.target.value)} 
-                        className="location-select"
-                    >
-                        <option value="">-- Choose a Room --</option>
-                        {rooms.map(room => (
-                            <option key={room.room_id} value={room.room_id}>
-                                Room {room.room_num} ({room.status})
-                            </option>
-                        ))}
-                    </select>
-                )}
-                <div className="location-arrow">
-                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                    /* ✅ NEW: Auto-Room Status Display (Replaces Dropdown) */
+                    <div className={`p-3 rounded-lg border flex items-center gap-3 w-full transition-colors ${
+                    isFetchingRoom ? 'bg-gray-50 border-gray-200' :
+                    activeRoom ? 'bg-green-50 border-green-200 text-green-800' : 
+                    'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    {isFetchingRoom ? (
+                            <span className="text-sm italic text-gray-500 flex items-center gap-2">
+                                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                                Detecting room...
+                            </span>
+                    ) : activeRoom ? (
+                            <div className="flex items-center justify-between w-full">
+                            <span className="font-bold flex items-center gap-2">
+                                <MapPin size={18} className="text-green-700" /> {/* ✅ Icon Replaces Emoji */}
+                                Room {activeRoom.room_num}
+                            </span>
+                            <span className="text-[10px] bg-green-200 px-2 py-0.5 rounded-full text-green-900 font-bold uppercase tracking-wider flex items-center gap-1">
+                                <CheckCircle size={10} /> {/* ✅ Added Check Icon */}
+                                Verified
+                            </span>
+                            </div>
+                    ) : (
+                            <span className="text-sm font-bold flex items-center gap-2">
+                            <AlertCircle size={18} /> {/* ✅ Replaces X or Emoji */}
+                            No active check-in found.
+                            </span>
+                    )}
                 </div>
+                )}
+                
+                {/* Arrow only for Dine-in */}
+                {orderType === 'Dine-in' && (
+                    <div className="location-arrow">
+                        <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                    </div>
+                )}
             </div>
           </div>
 
@@ -278,7 +309,7 @@ const CartPanel = ({ isOpen, onClose, activeRoom }) => {
                 disabled={
                     cart.length === 0 || 
                     (orderType === 'Dine-in' && !selectedTableId) || 
-                    (orderType === 'Room Dining' && !selectedRoomId) ||
+                    (orderType === 'Room Dining' && !activeRoom) || // ✅ DISABLES if no room found
                     isPlacingOrder
                 }
                 className="place-order-btn"
