@@ -18,8 +18,10 @@
   },
   "homepage": "https://github.com/Nishidell/Food-and-Beverages-System#readme",
   "description": "",
-  
   "engines": {
     "node": "20.x"
+  },
+  "dependencies": {
+    "nodemailer": "^7.0.11"
   }
 }
