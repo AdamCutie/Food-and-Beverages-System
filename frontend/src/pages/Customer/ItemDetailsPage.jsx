@@ -56,31 +56,39 @@ const ItemDetailsPage = () => {
     return `${cleanBase}${cleanPath}`;
   };
 
-  useEffect(() => {
-     // ... (Your existing fetchDetails logic) ...
-     // Keep this exactly as it was in previous step
-     const fetchDetails = async () => {
-        try {
-            setLoading(true);
-            const itemRes = await apiClient(`/items/${id}`);
-            if (!itemRes.ok) throw new Error('Item not found');
-            const itemData = await itemRes.json();
-            setItem(itemData);
 
-            const reviewRes = await apiClient(`/ratings/${id}`);
-            if (reviewRes.ok) {
-                const reviewData = await reviewRes.json();
-                setReviews(reviewData.reviews || []);
+    useEffect(() => {
+        const fetchDetails = async () => {
+            try {
+                setLoading(true);
+
+                // ✅ OPTIMIZATION: Fetch both Item and Reviews in parallel
+                // This cuts the waiting time roughly in half.
+                const [itemRes, reviewRes] = await Promise.all([
+                    apiClient(`/items/${id}`),
+                    apiClient(`/ratings/${id}`)
+                ]);
+
+                // 1. Process Item Data (Critical)
+                if (!itemRes.ok) throw new Error('Item not found');
+                const itemData = await itemRes.json();
+                setItem(itemData);
+
+                // 2. Process Reviews (Secondary)
+                if (reviewRes.ok) {
+                    const reviewData = await reviewRes.json();
+                    setReviews(reviewData.reviews || []);
+                }
+            } catch (error) {
+                toast.error(error.message);
+                navigate('/');
+            } finally {
+                setLoading(false);
             }
-        } catch (error) {
-            toast.error(error.message);
-            navigate('/');
-        } finally {
-            setLoading(false);
-        }
-     };
-     fetchDetails();
-  }, [id, navigate]);
+        };
+
+        fetchDetails();
+    }, [id, navigate]);
 
   // ❌ DELETE the old `useEffect` for polling notifications. The Context handles it now!
 
@@ -146,6 +154,7 @@ const ItemDetailsPage = () => {
         src={getImageUrl(item.image_url)} 
         alt={item.item_name}
         className="w-full h-full object-cover"
+        loading="lazy"
         // ✅ SAFETY NET: If image fails, switch to placeholder automatically
         onError={(e) => {
             e.target.onerror = null; 

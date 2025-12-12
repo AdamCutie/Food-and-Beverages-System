@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useNotifications } from '../../context/NotificationContext'; // ✅ Import Context
 import HeaderBar from './components/HeaderBar';
 import PromoBanner from './components/PromoBanner';
 import CategoryTabs from './components/CategoryTabs';
@@ -17,7 +18,6 @@ function MenuPage() {
   // --- Data State ---
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [notifications, setNotifications] = useState([]);
   
   // --- UI State ---
   const [selectedCategory, setSelectedCategory] = useState(0);
@@ -26,14 +26,20 @@ function MenuPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   // --- Hooks ---
-  const { isAuthenticated } = useAuth();
-  const { addToCart, cartCount } = useCart(); // ✅ Get Cart Actions directly
-  const navigate = useNavigate();
+  const { addToCart, cartCount } = useCart();
+  
+  // ✅ OPTIMIZATION: Use Global Notification Context (No local polling!)
+  const { 
+    notifications, 
+    unreadCount, 
+    markAllAsRead, 
+    deleteNotification, 
+    clearAllNotifications 
+  } = useNotifications();
 
-  // 1. Fetch Menu Data
+  // 1. Fetch Menu Data (Parallel - Keep this, it is good!)
   useEffect(() => {
     const fetchItems = async () => {
       try {
@@ -49,34 +55,14 @@ function MenuPage() {
         setCategories(await categoriesResponse.json());
       } catch (err) {
         console.error("Error fetching data:", err);
-        toast.error('Failed to load menu.');
+        // Only toast if it's not a strict rate limit (handled globally now)
+        if (err.message !== "Rate limit reached") {
+             toast.error('Failed to load menu.');
+        }
       }
     };
     fetchItems();
   }, []);
-
-  // 2. Poll Notifications (Only if logged in)
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const fetchNotifications = async () => {
-      if (isNotificationPanelOpen) return;
-      try {
-        const res = await apiClient('/notifications');
-        if (res.ok) {
-           const data = await res.json(); 
-           setNotifications(data.notifications || []);
-           setUnreadNotificationCount(data.unreadCount || 0);
-        }
-      } catch (err) {
-        // Silent fail for polling
-      }
-    };
-
-    fetchNotifications();
-    const intervalId = setInterval(fetchNotifications, 10000);
-    return () => clearInterval(intervalId);
-  }, [isAuthenticated, isNotificationPanelOpen]); 
 
   // --- Handlers ---
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
@@ -84,34 +70,16 @@ function MenuPage() {
   const handleSelectCategory = (category) => setSelectedCategory(category);
   
   const toggleNotificationPanel = () => {
-    const panelWillBeOpen = !isNotificationPanelOpen;
-    setIsNotificationPanelOpen(panelWillBeOpen);
-    if (panelWillBeOpen) {
-      setUnreadNotificationCount(0);
-      apiClient('/notifications/mark-read', { method: 'PUT' }).catch(console.error);
+    const willOpen = !isNotificationPanelOpen;
+    setIsNotificationPanelOpen(willOpen);
+    if (willOpen) {
+      markAllAsRead(); // ✅ Use Context function
     }
   };
 
-  const handleDeleteNotification = async (notificationId) => {
-    try {
-      await apiClient(`/notifications/${notificationId}`, { method: 'DELETE' });
-      setNotifications(prev => prev.filter(n => n.notification_id !== notificationId));
-      toast.success('Notification cleared.');
-    } catch (err) { toast.error('Failed to delete.'); }
-  };
-
-  const handleClearAllNotifications = async () => {
-    if (!window.confirm('Clear all notifications?')) return;
-    try {
-      await apiClient('/notifications/clear-all', { method: 'DELETE' });
-      setNotifications([]);
-      setUnreadNotificationCount(0); 
-      toast.success('All cleared.');
-    } catch (err) { toast.error('Failed to clear.'); }
-  };
-
-  // --- Filtering & Sorting ---
-  const getProcessedItems = () => {
+  // ✅ OPTIMIZATION: Memoize Filtering & Sorting
+  // This prevents the menu from re-sorting every time the notification panel opens.
+  const finalItems = useMemo(() => {
     let result = items
       .filter(item => selectedCategory === 0 || item.category_id === selectedCategory)
       .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -132,17 +100,17 @@ function MenuPage() {
       default: break;
     }
     return result;
-  };
+  }, [items, selectedCategory, searchTerm, sortOption]); // Dependencies
 
   return (
     <div className="customer-page-container">
       {/* 1. Header */}
       <HeaderBar
-        cartCount={cartCount} // ✅ From Context
+        cartCount={cartCount}
         onCartToggle={toggleCart}
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}
-        notificationCount={unreadNotificationCount}
+        notificationCount={unreadCount} // ✅ Use Context Value
         onNotificationToggle={toggleNotificationPanel}
       />
 
@@ -159,9 +127,9 @@ function MenuPage() {
         
         {/* 3. Food Grid */}
         <FoodGrid
-          items={getProcessedItems()}
+          items={finalItems} // ✅ Use Memoized Items
           onAddToCart={(item) => {
-              addToCart(item); // ✅ From Context
+              addToCart(item);
               toast.success('Added to cart!');
           }}
           onImageClick={(imageUrl) => setSelectedImage(imageUrl)}
@@ -169,8 +137,6 @@ function MenuPage() {
       </main>
 
       {/* 4. Panels & Modals */}
-      
-      {/* ✅ CartPanel is now Autonomous */}
       <CartPanel 
         isOpen={isCartOpen} 
         onClose={toggleCart} 
@@ -179,9 +145,9 @@ function MenuPage() {
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
         onClose={toggleNotificationPanel}
-        notifications={notifications}
-        onDeleteOne={handleDeleteNotification}
-        onClearAll={handleClearAllNotifications}
+        notifications={notifications} // ✅ Pass Context Data
+        onDeleteOne={deleteNotification}
+        onClearAll={clearAllNotifications}
       />
 
       <ImageModal 
