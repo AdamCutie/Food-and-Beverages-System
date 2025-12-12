@@ -95,16 +95,19 @@ export const getDashboardAnalytics = async (req, res) => {
         queryParams,
         []
       ),
-      
-      // 6. Payment Methods (Ignored Filter usually, but we keep it clean)
+
+      // 6. Payment Methods (✅ NOW LISTENS TO THE FILTER)
       safeQuery(
         `SELECT p.payment_method, COUNT(p.payment_id) AS transactions, SUM(p.amount) AS total_value 
          FROM fb_payments p
          JOIN fb_orders o ON p.order_id = o.order_id
-         WHERE p.payment_status = 'paid' AND o.status != 'cancelled' ${monthCondition}
+         -- ✅ Added \${typeCondition} here so it filters by Room/Dine-in/etc.
+         WHERE p.payment_status = 'paid' AND o.status != 'cancelled' ${typeCondition} ${monthCondition}
          GROUP BY p.payment_method`,
-        [], []
+        queryParams, // ✅ PASS queryParams here (it was [] before)
+        []
       ),
+      
       // 7. Order Type Distribution
       safeQuery(
         `SELECT 
