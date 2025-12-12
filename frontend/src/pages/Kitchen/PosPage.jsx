@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import InternalNavBar from './components/InternalNavBar';
 import CategoryTabs from '../Customer/components/CategoryTabs';
@@ -180,7 +180,8 @@ function PosPage() {
     }
   };
 
-  const getProcessedItems = () => {
+// ✅ OPTIMIZATION: Cache the filtered/sorted list
+  const finalItems = useMemo(() => {
     let result = items
       .filter(item => selectedCategory === 0 || item.category_id === selectedCategory)
       .filter(item => item.item_name.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -201,9 +202,7 @@ function PosPage() {
       default: break;
     }
     return result;
-  };
-
-  const finalItems = getProcessedItems();
+  }, [items, selectedCategory, searchTerm, sortOption]); // Only re-run if these change
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#523a2e]">

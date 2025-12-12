@@ -193,7 +193,7 @@ export const createPayMongoPayment = async (req, res) => {
                         cancel_url: `${process.env.FRONTEND_URL}/payment-cancel`,
                         description: `Food & Beverages Order`,
                         show_line_items: true,
-                        send_email_receipt: true,
+                        send_email_receipt: false,
                         metadata: orderMetadata
                     }
                 }
@@ -227,7 +227,6 @@ export const paymongoWebhook = async (req, res) => {
         // 1. Security Check & Parsing
         let event;
         try {
-            // ✅ Calls the correct helper function we defined above
             event = validateWebhookSignature(req);
         } catch (err) {
             console.error(`❌ Webhook Security Error: ${err.message}`);
@@ -264,7 +263,6 @@ export const paymongoWebhook = async (req, res) => {
         }
 
         // B. Prepare Data using the Helper
-        // ✅ Calls the helper function we added to this file
         const orderData = parseOrderMetadata(paymentData.attributes.metadata);
 
         // C. Insert Order
@@ -312,37 +310,51 @@ export const paymongoWebhook = async (req, res) => {
 
         // F. Get Client Info
         const [clientRows] = await connection.query(
-            "SELECT first_name, last_name FROM tbl_client_users WHERE client_id = ?", 
+            "SELECT first_name, last_name, email FROM tbl_client_users WHERE client_id = ?", 
             [orderData.client_id]
         );
-        const clientInfo = clientRows[0] || { first_name: 'Guest', last_name: '' };
+        // Note: Make sure your SELECT query actually grabs the 'email' column!
+        const clientInfo = clientRows[0] || { first_name: 'Guest', last_name: '', email: null };
+
+        // G. Update Table / Room Status
+        if (orderData.table_id) {
+            await connection.query("UPDATE fb_tables SET status = 'Occupied' WHERE table_id = ?", [orderData.table_id]);
+        } else if (orderData.room_id) {
+            await connection.query("UPDATE tbl_rooms SET status = 'Occupied' WHERE room_id = ?", [orderData.room_id]);
+        }
+
+        // ✅ COMMIT TRANSACTION (Data is safe now)
+        await connection.commit();
+
 
         // ==========================================
-        // 🔥 G. UPDATE TABLE / ROOM STATUS (Restored)
+        // 🔥 H. SEND CUSTOM EMAIL
         // ==========================================
         
-        // 1. If it's a Table Order, set table to Occupied
-        if (orderData.table_id) {
-            await connection.query(
-                "UPDATE fb_tables SET status = 'Occupied' WHERE table_id = ?", 
-                [orderData.table_id]
-            );
-            console.log(`🪑 Table ${orderData.table_id} updated to Occupied`);
-        } 
-        
-        // 2. If it's a Room Order, set room to Occupied (If applicable)
-        // (I assumed the table name is tbl_rooms and column is status based on your previous code)
-        else if (orderData.room_id) {
-            await connection.query(
-                "UPDATE tbl_rooms SET status = 'Occupied' WHERE room_id = ?", 
-                [orderData.room_id]
-            );
-            console.log(`🏨 Room ${orderData.room_id} updated to Occupied`);
+        // We do this AFTER commit so we don't send emails for failed DB inserts.
+        // We wrap it in a try/catch so email failure doesn't crash the webhook response.
+        if (clientInfo.email) {
+            try {
+                console.log(`📧 Sending receipt to ${clientInfo.email}...`);
+                
+                await sendReceiptEmail(
+                    clientInfo.email, 
+                    `${clientInfo.first_name} ${clientInfo.last_name}`, 
+                    orderData, 
+                    new_order_id
+                );
+                
+                console.log(`✅ Email sent successfully.`);
+            } catch (emailError) {
+                console.error(`⚠️ Failed to send receipt email:`, emailError);
+                // We do NOT return an error response here, because the order is already successful.
+            }
+        } else {
+            console.log(`⚠️ No email found for client, skipping receipt.`);
         }
 
         // ==========================================
 
-        await connection.commit();
 
         // 4. Real-time Notification
         const io = req.app.get('io');
