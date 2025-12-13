@@ -70,7 +70,7 @@ const LoginPage = () => {
          <div className="relative z-10 w-full h-full flex flex-col justify-end items-center p-12 lg:p-20 text-white text-center">
              <div className="mb-6">
           <img 
-              src="/images/hotel_logo.png" 
+              src="/images/foodAndBeverages.png" 
               alt="Celestia Dining" 
               className="h-32 w-auto object-contain drop-shadow-lg" 
           />
@@ -95,7 +95,7 @@ const LoginPage = () => {
         {/* Skip Button */}
         <button 
             onClick={() => navigate('/')} 
-            className="absolute top-8 right-8 text-[#0B3D2E]/60 hover:text-[#0B3D2E] text-sm font-bold flex items-center gap-2 transition-colors"
+            className="absolute top-8 right-8 text-[#0B3D2E]/60 hover:text-[#0B3D2E] text-xl font-bold flex items-center gap-2 transition-colors"
         >
             Explore Dining <ArrowRight size={16}/>
         </button>
