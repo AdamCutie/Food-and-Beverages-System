@@ -1,7 +1,6 @@
 import pool from "../config/mysql.js";
 
 // Helper function to create a log entry
-// UPDATED: Now accepts employee_id instead of staff_id
 const createLog = async (ingredient_id, employee_id, action_type, quantity_change, new_stock_level, reason, connection) => {
     const logSql = "INSERT INTO fb_inventory_logs (ingredient_id, employee_id, action_type, quantity_change, new_stock_level, reason) VALUES (?, ?, ?, ?, ?, ?)";
     await (connection || pool).query(logSql, [ingredient_id, employee_id, action_type, quantity_change, new_stock_level, reason || null]);
@@ -32,7 +31,8 @@ export const getIngredientById = async (req, res) => {
 
 // @desc    Create a new ingredient
 export const createIngredient = async (req, res) => {
-    const { name, stock_level = 0, unit_of_measurement } = req.body;
+    // ✅ Extract reorder_point from request (Default to 10 if missing)
+    const { name, stock_level = 0, unit_of_measurement, reorder_point = 10 } = req.body;
 
     if (!name || !unit_of_measurement) {
         return res.status(400).json({ message: "Name and unit of measurement are required." });
@@ -53,9 +53,9 @@ export const createIngredient = async (req, res) => {
         }
         const employee_id = empRows[0].employee_id;
 
-        // 2. Insert Ingredient
-        const sql = "INSERT INTO fb_ingredients (name, stock_level, unit_of_measurement) VALUES (?, ?, ?)";
-        const [result] = await connection.query(sql, [name, stock_level, unit_of_measurement]);
+        // 2. Insert Ingredient (✅ Added reorder_point column)
+        const sql = "INSERT INTO fb_ingredients (name, stock_level, unit_of_measurement, reorder_point) VALUES (?, ?, ?, ?)";
+        const [result] = await connection.query(sql, [name, stock_level, unit_of_measurement, reorder_point]);
         const newIngredientId = result.insertId;
 
         // 3. Log using employee_id
@@ -66,7 +66,8 @@ export const createIngredient = async (req, res) => {
             ingredient_id: newIngredientId,
             name,
             stock_level,
-            unit_of_measurement
+            unit_of_measurement,
+            reorder_point // ✅ Return new value
         });
     } catch (error) {
         await connection.rollback();
@@ -79,7 +80,8 @@ export const createIngredient = async (req, res) => {
 
 // @desc    Update ingredient details
 export const updateIngredientDetails = async (req, res) => {
-    const { name, unit_of_measurement } = req.body;
+    // ✅ Extract reorder_point to allow editing
+    const { name, unit_of_measurement, reorder_point } = req.body;
     const { id } = req.params;
 
     if (!name || !unit_of_measurement) {
@@ -87,8 +89,12 @@ export const updateIngredientDetails = async (req, res) => {
     }
 
     try {
-        const sql = "UPDATE fb_ingredients SET name = ?, unit_of_measurement = ? WHERE ingredient_id = ?";
-        const [result] = await pool.query(sql, [name, unit_of_measurement, id]);
+        // ✅ Update SQL query to include reorder_point
+        const sql = "UPDATE fb_ingredients SET name = ?, unit_of_measurement = ?, reorder_point = ? WHERE ingredient_id = ?";
+        // Use a default (10) if reorder_point is somehow undefined, though frontend should send it
+        const safeReorderPoint = reorder_point !== undefined ? reorder_point : 10;
+        
+        const [result] = await pool.query(sql, [name, unit_of_measurement, safeReorderPoint, id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: "Ingredient not found" });
@@ -186,7 +192,6 @@ export const deleteIngredient = async (req, res) => {
 // @desc    Get all inventory logs
 export const getInventoryLogs = async (req, res) => {
     try {
-        // UPDATED: Join with 'employees' table instead of 'staff'
         const sql = `
         SELECT 
             l.*, 

@@ -150,7 +150,7 @@ const TableManagement = () => {
               <th>Table Number</th>
               <th>Capacity</th>
               <th>Status</th>
-              <th className="text-center">Actions</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -173,8 +173,8 @@ const TableManagement = () => {
                             {table.status}
                         </span>
                     </td>
-                    <td className="text-center">
-                      <div className="flex justify-center gap-3">
+                    <td className="text-start">
+                      <div className="flex justify-left">
                         <button 
                             onClick={() => { setEditingTable(table); setIsModalOpen(true); }} 
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"

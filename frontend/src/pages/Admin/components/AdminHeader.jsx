@@ -56,7 +56,7 @@ const hoverLinkStyle = {
       {/* Left: Logo and Title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         <Link to="/admin">
-          <img src="/images/logo_var.svg" alt="Logo" style={{ height: '64px' }} />
+          <img src="/images/foodAndBeverages.png" alt="Logo" style={{ height: '64px' }} />
         </Link>
       </div>
       

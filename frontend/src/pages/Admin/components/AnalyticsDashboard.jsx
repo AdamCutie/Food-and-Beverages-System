@@ -160,6 +160,25 @@ const orderTypeData = (data.orderTypeDistribution || [])
   sales: Number(i.total_sales),
 }));
 
+const CustomXAxisTick = ({ x, y, payload }) => {
+  if (!payload || !payload.value) return null;
+
+  // Split the name by space
+  const words = payload.value.split(' ');
+
+  return (
+    <g transform={`translate(${x},${y + 20})`}>
+      <text x={0} y={0} dy={25} textAnchor="middle" fill="#3C2A21" fontSize={12} fontWeight="bold">
+        {words.map((word, index) => (
+          <tspan x={0} dy={index === 0 ? 0 : 14} key={index}>
+            {word}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+};
+
   return (
     <div className="w-full">
       
@@ -283,9 +302,14 @@ const orderTypeData = (data.orderTypeDistribution || [])
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={topItemsData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#D1C0B6" />
-              <XAxis dataKey="name" stroke="#3C2A21" />
+              <XAxis dataKey="name" stroke="#3C2A21" interval={0} tick={<CustomXAxisTick />} height={80}/>
               <YAxis stroke="#3C2A21" />
-              <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#fff2e0', borderColor: '#D1C0B6', color: '#3C2A21' }} />
+                  <Tooltip 
+          // ✅ FIX: Removes Peso sign and decimals (e.g., "25")
+          formatter={(val) => [Math.floor(Number(val)), "Quantity Sold"]} 
+          cursor={{ fill: '#fceabb' }}
+          contentStyle={{ backgroundColor: '#fff2e0', borderColor: '#D1C0B6', color: '#3C2A21' }} 
+      />
               <Bar dataKey="sold" fill="#3C2A21" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -313,7 +337,7 @@ const orderTypeData = (data.orderTypeDistribution || [])
                     <Cell key={i} fill={THEME_COLORS[i % THEME_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(val) => `₱${val.toLocaleString()}`} contentStyle={{ backgroundColor: '#fff2e0', borderColor: '#D1C0B6', color: '#3C2A21' }} />
+                <Tooltip formatter={(val) => `${val.toLocaleString()}`} contentStyle={{ backgroundColor: '#fff2e0', borderColor: '#D1C0B6', color: '#3C2A21' }} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>

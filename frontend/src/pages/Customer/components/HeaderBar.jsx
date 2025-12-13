@@ -25,7 +25,7 @@ export default function HeaderBar({
       <div className="header-col-start">
         <Link to="/" className="flex items-center">
             <img 
-                src="/images/logo_var.svg" 
+                src="/images/foodAndBeverages.png" 
                 alt="Celestia Hotel Logo" 
                 className="header-logo cursor-pointer hover:opacity-90 transition-opacity"
             />
