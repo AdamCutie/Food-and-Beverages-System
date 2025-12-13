@@ -108,46 +108,74 @@ export const createPayMongoPayment = async (req, res) => {
         const { cart_items, table_id, room_id, special_instructions } = req.body;
         const client_id = req.user.id;
 
-        // 1. Validation
         if (!cart_items || cart_items.length === 0) {
             return res.status(400).json({ message: "Cart is empty" });
         }
 
-        // 2. Calculate Totals & Build Items
         let itemsTotal = 0;
         const orderItemsData = [];
 
+        // --- 1. Fetch Prices WITH Discounts (Fixing the mismatch) ---
         for (const item of cart_items) {
-            const [menuItem] = await pool.query("SELECT item_name, price FROM fb_menu_items WHERE item_id = ?", [item.item_id]);
+            // UPDATED QUERY: Join with promotions table
+            const [rows] = await pool.query(`
+                SELECT 
+                    mi.item_name, 
+                    mi.price,
+                    p.discount_percentage,
+                    p.start_date,
+                    p.end_date,
+                    p.is_active
+                FROM fb_menu_items mi
+                LEFT JOIN fb_promotions p ON mi.promotion_id = p.promotion_id
+                WHERE mi.item_id = ?
+            `, [item.item_id]);
 
-            if (menuItem.length === 0) {
+            if (rows.length === 0) {
                 return res.status(404).json({ message: `Item ${item.item_id} not found` });
             }
 
-            const price = parseFloat(menuItem[0].price);
-            itemsTotal += price * item.quantity;
+            const dbItem = rows[0];
+            let finalPrice = parseFloat(dbItem.price);
+
+            // --- Apply Discount Logic ---
+            if (dbItem.discount_percentage && dbItem.is_active) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // Ignore time, compare dates only
+                const startDate = new Date(dbItem.start_date);
+                const endDate = new Date(dbItem.end_date);
+
+                if (today >= startDate && today <= endDate) {
+                    const discount = parseFloat(dbItem.discount_percentage) / 100;
+                    finalPrice = finalPrice * (1 - discount);
+                }
+            }
+            // -----------------------------
+
+            itemsTotal += finalPrice * item.quantity;
 
             orderItemsData.push({
                 item_id: item.item_id,
-                item_name: menuItem[0].item_name,
+                item_name: dbItem.item_name,
                 quantity: item.quantity,
-                price_on_purchase: price,
+                price_on_purchase: finalPrice, // Store the discounted price
                 instructions: item.instructions || ''
             });
         }
 
-        // 3. Tax & Service Charge Calculation
+        // 2. Tax & Service Charge Calculation (Same logic as Frontend)
         const serviceCharge = itemsTotal * SERVICE_RATE;
         const subtotalWithService = itemsTotal + serviceCharge;
         const vatAmount = subtotalWithService * VAT_RATE;
         const totalAmount = subtotalWithService + vatAmount;
 
-        // 4. Build PayMongo Line Items
+        // 3. Build PayMongo Line Items
         const line_items = [
             ...orderItemsData.map(item => ({
                 name: item.item_name,
                 quantity: item.quantity,
-                amount: Math.round(item.price_on_purchase * 100),
+                // PayMongo requires integers (centavos), so multiply by 100 and round
+                amount: Math.round(item.price_on_purchase * 100), 
                 currency: 'PHP'
             })),
             {
@@ -164,7 +192,7 @@ export const createPayMongoPayment = async (req, res) => {
             }
         ];
 
-        // 5. Prepare Metadata
+        // 4. Prepare Metadata (Keep existing logic)
         const orderMetadata = {
             client_id: client_id.toString(),
             table_id: table_id ? table_id.toString() : '',
@@ -177,7 +205,7 @@ export const createPayMongoPayment = async (req, res) => {
             order_items: JSON.stringify(orderItemsData)
         };
 
-        // 6. Call PayMongo API
+        // 5. Call PayMongo API
         const paymongoResponse = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
             method: 'POST',
             headers: {
