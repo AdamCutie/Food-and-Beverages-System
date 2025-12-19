@@ -1,6 +1,7 @@
 import React from 'react';
 import { Toaster } from 'react-hot-toast';
 import { Routes, Route } from 'react-router-dom';
+import Snowfall from 'react-snowfall';
 
 // Import Pages
 import MenuPage from './pages/Customer/MenuPage';
@@ -25,8 +26,35 @@ import ProtectedRoute from './components/routing/ProtectedRoute';
 import AuthRoute from './components/routing/AuthRoute';
 
 function App() {
+  // --- SEASONAL LOGIC ---
+  // JavaScript months are 0-indexed (0 = Jan, 11 = Dec)
+  const currentMonth = new Date().getMonth();
+  const isDecember = currentMonth === 11; 
+  
+  // TIP: To test this if it's NOT December right now, uncomment the line below:
+  // const isDecember = true; 
+
   return (
     <>
+      {/* ✅ CONDITIONAL RENDERING:
+        The Snowfall component only exists in the DOM if isDecember is true.
+      */}
+      {isDecember && (
+        <Snowfall 
+            color="#82C3D9"
+            snowflakeCount={150}
+            style={{
+            position: 'fixed',
+            width: '100vw',
+            height: '100vh',
+            zIndex: 50,
+            pointerEvents: 'none',
+            top: 0,
+            left: 0,
+          }}
+        />
+      )}
+
       <Toaster 
         position="top-center" 
         toastOptions={{
