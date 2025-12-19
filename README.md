@@ -3,6 +3,7 @@
 A comprehensive web application designed to manage the Food & Beverage operations of a hotel. This system handles Ordering (Dine-in, Room Service, Walk-in), Point of Sale (POS), Inventory Management (with "Low Stock" alerts), Kitchen Management, and Analytics.
 
 ---
+[🎥 Watch the System Demo](./image/food-and-Beverages.mp4)
 
 ##  Tech Stack
 
@@ -197,87 +198,18 @@ Scroll down to Environment Variables.
 
 Add the following keys (copy values from your local `.env`):
 ```env
-DB_HOST
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-DB_NAME
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-DB_PASSWORD
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-DB_USER
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-DEV_MODE
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-FRONTEND_URL
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-JWT_SECRET
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-PAYMONGO_PUBLIC_KEY
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-PAYMONGO_SECRET_KEY
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-PAYMONGO_WEBHOOK_SECRET
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-PORT
-Value
-value
-• • • • • • • • • • • •
-
-
-Key
-VITE_API_URL
-Value
-value
-• • • • • • • • • • • •
+DB_HOST=• • • • • • • • • • • •
+DB_NAME=• • • • • • • • • • • •
+DB_PASSWORD=• • • • • • • • • • • •
+DB_USER=• • • • • • • • • • • •
+DEV_MODE=• • • • • • • • • • • •
+FRONTEND_URL=• • • • • • • • • • • •
+JWT_SECRET=• • • • • • • • • • • •
+PAYMONGO_PUBLIC_KEY=• • • • • • • • • • • •
+PAYMONGO_SECRET_KEY=• • • • • • • • • • • •
+PAYMONGO_WEBHOOK_SECRET=• • • • • • • • • • • •
+PORT=• • • • • • • • • • • •
+VITE_API_URL=• • • • • • • • • • • •
 
 ```
 
