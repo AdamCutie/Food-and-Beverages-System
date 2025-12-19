@@ -10,6 +10,7 @@ A comprehensive web application designed to manage the Food & Beverage operation
 * **Backend:** Node.js, Express.js
 * **Database:** Clever Cloud MySQL
 * **Tools:** VS Code, Git
+* **Deployment:** Render
 
 ---
 
@@ -118,6 +119,79 @@ npm start
 * Verify they appear correctly in the Kitchen View.
 
 
+🚀 Production Deployment Guide
+Follow these steps to deploy the application to production using Render.
+
+Step 1: Push Code to GitHub
+Open your terminal in the project folder and run the following commands to push your code:
+
+# Initialize a new git repository
+git init
+
+# Stage all files
+git add .
+
+# Commit the files
+git commit -m "Ready for production"
+
+# Link to your GitHub repository
+git remote add origin [https://github.com/Nishidell/Food-and-Beverages-System.git](https://github.com/your-github-name/Food-and-Beverages-System.git)
+
+# Push to the master branch
+git push -u origin master
+
+Step 2: Create a Render Account
+1.Go to Render.com.
+
+2.Sign up using your GitHub account (recommended for easy integration).
+
+Step 3: Create a New Web Service
+1.On the Render Dashboard, click New + and select Web Service.
+
+2.Select the Food-and-Beverages-System repository from the list.
+
+Step 4: Configure the Service
+Fill in the deployment details exactly as below to match the package.json configuration:
+
+Name: food-and-beverages-system
+
+Region: Select your closest region (e.g., Singapore).
+
+Branch: master
+
+Root Directory: (Leave blank)
+
+Runtime: Node
+
+Build Command: npm run build
+
+Start Command: npm run start
+
+Instance Type: Free
+
+Step 5: Environment Variables (.env)
+You must manually add your environment variables in the Environment tab on Render. The app will not connect to the database without these.
+
+Scroll down to Environment Variables.
+
+Add the following keys (copy values from your local .env):
+
+DB_HOST
+
+DB_USER
+
+DB_PASS
+
+DB_NAME
+
+PORT (Optional)
+
+Step 6: Deploy
+1.Click Create Web Service.
+
+2.Render will start building your app. You can view the progress in the "Logs" tab.
+
+3.Once the logs say "Your service is live", your application is accessible via the provided Render URL.
 
 ---
 
