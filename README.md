@@ -239,6 +239,22 @@ PAYMONGO_WEBHOOK_SECRET= Secret used to verify webhook signatures
 
 ---
 
+## 🎉 Deployment Success
+
+How to know if your deployment worked:
+
+1.  Go to the **Logs** tab in your Render Dashboard.
+2.  Wait for the build process to finish (this may take a few minutes).
+3.  Look for the following confirmation message:
+
+> **"Your service is live"** 🚀
+>
+> **"Available at your primary URL https://food-and-beverages-system.onrender.com"**
+
+Click the URL to access your live application. **Congratulations!**
+
+---
+
 ##  Troubleshooting
 
 * **"Connection Refused" Error:**
